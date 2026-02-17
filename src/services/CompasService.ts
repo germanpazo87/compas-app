@@ -81,9 +81,9 @@ interface AskParams {
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 const model = genAI.getGenerativeModel({ 
-  model: "gemini-3-flash", // ✅ El model correcte del 2026
+  model: "gemini-3.0-flash", // ✅ El model correcte del 2026
 }, {
-  apiVersion: 'v1' // 👈 AFEGEIX AIXÒ: Forcem l'ús de l'API estable, on viu el model
+  apiVersion: 'v1beta' // 👈 AFEGEIX AIXÒ: Forcem l'ús de l'API estable, on viu el model
 });
 // 🛡️ HELPER: Crea àrees buides per evitar crash
 const createEmptyArea = (): any => ({
