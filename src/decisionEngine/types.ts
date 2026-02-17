@@ -17,7 +17,8 @@ export type PedagogicalDecisionType =
   | "spaced_review" // Revisió espaiada per consolidar
   | "interleave_prerequisite" // Intercalar prerequisit
   | "advance_current" // Avançar a concepte més difícil
-  | "remediate_current"; // Reforçar concepte actual amb més pràctica
+  | "remediate_current" // Reforçar concepte actual amb més pràctica
+  | "advance_to_next";
 
 /**
  * Configuració del motor de decisions
@@ -44,6 +45,8 @@ export interface DecisionEngineInput {
   lastPerformanceScore: number; // 0–1: Rendiment en últim intent
   currentTime: number; // Timestamp actual (ms)
 
+  lastEvocationScore?: number; // Opcional per compatibilitat
+  
   config: DecisionEngineConfig;
 }
 
