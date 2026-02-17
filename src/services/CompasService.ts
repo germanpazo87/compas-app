@@ -78,13 +78,12 @@ interface AskParams {
 
 // --- CONFIGURACIÓ ---
 
-// 1. Forcem la versió de l'API a 'v1' per evitar el 404 del model Gemini 3
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-// 2. Utilitzem la versió 'preview'. 
-// Al febrer de 2026, el Gemini 3 Flash és el model de referència.
 const model = genAI.getGenerativeModel({ 
-  model: "gemini-3-flash" 
+  model: "gemini-3-flash", // ✅ El model correcte del 2026
+}, {
+  apiVersion: 'v1' // 👈 AFEGEIX AIXÒ: Forcem l'ús de l'API estable, on viu el model
 });
 // 🛡️ HELPER: Crea àrees buides per evitar crash
 const createEmptyArea = (): any => ({
