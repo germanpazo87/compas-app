@@ -93,18 +93,28 @@ const PYTH_TRIPLES: readonly [number, number, number][] = [
 
 function generateRightTriangleId(): ExerciseParams {
   const NAMED: readonly [number, number, number][] = [[3, 4, 5], [5, 12, 13], [8, 15, 17]];
-  const NON_RIGHT: readonly [number, number, number][] = [
-    [3, 4, 6], [5, 6, 8], [2, 4, 5], [6, 7, 9], [4, 6, 7], [3, 5, 6], [7, 8, 11], [5, 8, 10],
+  // Clearly non-right distractors: obtuse (visually wide) and equilateral shapes
+  const NON_RIGHT_DISTRACTORS: readonly [number, number, number][] = [
+    [2, 2, 3],  // isosceles acute — very flat
+    [4, 4, 5],  // isosceles acute
+    [3, 3, 5],  // isosceles obtuse — clearly wide
+    [2, 6, 7],  // scalene obtuse — very asymmetric
+    [5, 5, 9],  // isosceles obtuse — very wide
+    [3, 3, 3],  // equilateral — clearly no right angle
+    [2, 4, 5],  // scalene obtuse
+    [6, 6, 6],  // equilateral
+    [2, 2, 2],  // equilateral small
+    [4, 7, 8],  // scalene obtuse
   ];
 
   const [ra, rb, rc] = randomFrom(NAMED);
 
   // Pick 2 distinct non-right distractors using index-based selection
-  const d1Idx = randomInt(0, NON_RIGHT.length - 1);
-  let d2Idx   = randomInt(0, NON_RIGHT.length - 2);
+  const d1Idx = randomInt(0, NON_RIGHT_DISTRACTORS.length - 1);
+  let d2Idx   = randomInt(0, NON_RIGHT_DISTRACTORS.length - 2);
   if (d2Idx >= d1Idx) d2Idx++;
-  const d1 = NON_RIGHT[d1Idx];
-  const d2 = NON_RIGHT[d2Idx];
+  const d1 = NON_RIGHT_DISTRACTORS[d1Idx];
+  const d2 = NON_RIGHT_DISTRACTORS[d2Idx];
 
   // Choose random position for the correct (right) triangle
   const correctTriangle = randomInt(0, 2);
@@ -125,6 +135,9 @@ function generateRightTriangleId(): ExerciseParams {
       t2a: ordered[1][0], t2b: ordered[1][1], t2c: ordered[1][2],
       t3a: ordered[2][0], t3b: ordered[2][1], t3c: ordered[2][2],
       correctTriangle,
+      t1rot: randomFrom([0, 90, 180, 270] as const),
+      t2rot: randomFrom([0, 90, 180, 270] as const),
+      t3rot: randomFrom([0, 90, 180, 270] as const),
     },
     unknownField: 'correctTriangle',
     preferredLanguage: 'ca',
@@ -137,7 +150,7 @@ function generateHypotenuseId(): ExerciseParams {
   // We encode: answer = c (the hypotenuse value) so evaluator can check numerically.
   return {
     type: 'HYPOTENUSE_ID',
-    values: { sideA: a, sideB: b, sideC: c, hypotenuse: c },
+    values: { sideA: a, sideB: b, sideC: c, hypotenuse: c, rot: randomFrom([0, 90, 180, 270] as const) },
     unknownField: 'hypotenuse',
     preferredLanguage: 'ca',
   };

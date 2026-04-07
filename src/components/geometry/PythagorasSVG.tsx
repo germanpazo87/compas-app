@@ -91,9 +91,10 @@ export interface PythagorasTriangleSVGProps {
   legA: number;
   legB: number;
   hypotenuse: number;
-  unknownSide: 'legA' | 'legB' | 'hypotenuse';
+  unknownSide: 'legA' | 'legB' | 'hypotenuse' | 'none';
   showRightAngle?: boolean;
   rotation?: 0 | 90 | 180 | 270;
+  showLabels?: boolean;   // when false, side value labels are hidden (default true)
   // Stepped exercise interaction
   stepMode?: 'click_corner' | 'click_side';
   onElementClick?: (id: string) => void;
@@ -116,6 +117,7 @@ export interface PythagorasTriangleSVGProps {
  */
 export function PythagorasTriangleSVG({
   legA, legB, hypotenuse, unknownSide, showRightAngle = true,
+  showLabels = true,
   rotation = 0,
   stepMode, onElementClick, selectedElement, correctElement,
 }: PythagorasTriangleSVGProps) {
@@ -238,15 +240,19 @@ export function PythagorasTriangleSVG({
       </g>
 
       {/* ── Upright labels (outside rotated group, use rotated positions) ── */}
-      <text x={(rBL[0] + rBR[0]) / 2} y={(rBL[1] + rBR[1]) / 2 + 18}
-        textAnchor="middle" dominantBaseline="middle"
-        fontSize={14} fontWeight="600" fill={colorA}>{labelA}</text>
-      <text x={rBL[0] - 14} y={(rBL[1] + rTL[1]) / 2}
-        textAnchor="end" dominantBaseline="middle"
-        fontSize={14} fontWeight="600" fill={colorB}>{labelB}</text>
-      <text x={hLx} y={hLy}
-        textAnchor="middle" dominantBaseline="middle"
-        fontSize={14} fontWeight="600" fill={colorH}>{labelH}</text>
+      {showLabels && (
+        <>
+          <text x={(rBL[0] + rBR[0]) / 2} y={(rBL[1] + rBR[1]) / 2 + 18}
+            textAnchor="middle" dominantBaseline="middle"
+            fontSize={14} fontWeight="600" fill={colorA}>{labelA}</text>
+          <text x={rBL[0] - 14} y={(rBL[1] + rTL[1]) / 2}
+            textAnchor="end" dominantBaseline="middle"
+            fontSize={14} fontWeight="600" fill={colorB}>{labelB}</text>
+          <text x={hLx} y={hLy}
+            textAnchor="middle" dominantBaseline="middle"
+            fontSize={14} fontWeight="600" fill={colorH}>{labelH}</text>
+        </>
+      )}
 
     </svg>
   );
@@ -266,7 +272,7 @@ const IDENTIFY_PANELS: readonly [number, number, number, number][] = [
 ];
 
 export interface PythagorasIdentifySVGProps {
-  triangles: Array<{ a: number; b: number; c: number }>;
+  triangles: Array<{ a: number; b: number; c: number; rotation?: number }>;
   selectedIndex: number | null;
   showAnswer: boolean;
   correctIndex: number;
@@ -305,7 +311,9 @@ export function PythagorasIdentifySVG({
                 rx={8} fill="none"
                 stroke={color} strokeWidth={2} strokeDasharray="6 3" />
             )}
-            <polygon points={pts} fill={`${color}20`} stroke={color} strokeWidth={2.5} />
+            <g transform={`rotate(${t.rotation ?? 0}, ${cx}, ${cy})`}>
+              <polygon points={pts} fill={`${color}20`} stroke={color} strokeWidth={2.5} />
+            </g>
             <text x={cx} y={cy + 90}
               textAnchor="middle" fontSize={13} fontWeight="600" fill={C.text}>
               Triangle {i + 1}
@@ -394,25 +402,6 @@ export function PythagorasHypotenuseSVG({
         <circle cx={V2[0]} cy={V2[1]} r={4} fill={C.primary} />
       </g>
 
-      {/* Labels: rendered outside rotated group — always upright */}
-      {SIDES.map((s, i) => {
-        const [from, to] = rEdgePairs[i];
-        const m          = midpt(from, to);
-        const [ox, oy]   = perp(from, to, 16);
-        // Pick the offset direction that pushes the label away from the centroid
-        const d1 = (m[0] + ox - CX) ** 2 + (m[1] + oy - CY) ** 2;
-        const d2 = (m[0] - ox - CX) ** 2 + (m[1] - oy - CY) ** 2;
-        const lx = d1 > d2 ? m[0] + ox : m[0] - ox;
-        const ly = d1 > d2 ? m[1] + oy : m[1] - oy;
-        return (
-          <text key={s}
-            x={lx} y={ly}
-            textAnchor="middle" dominantBaseline="middle"
-            fontSize={13} fontWeight="600" fill={sideColor(s)}>
-            Costat {s}
-          </text>
-        );
-      })}
     </svg>
   );
 }

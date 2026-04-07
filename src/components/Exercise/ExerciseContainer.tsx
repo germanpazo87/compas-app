@@ -154,6 +154,9 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
   // 🧠 ESTAT DE BLOQUEIG D'EVOCACIÓ
   const [isEvocationRequired, setIsEvocationRequired] = useState(false);
 
+  // 🔬 DEV: bypass the evocation gate so exercises load immediately
+  const [bypassEvocation, setBypassEvocation] = useState(false);
+
   // Sincronització amb el pare
   useEffect(() => {
     if (student) {
@@ -397,16 +400,18 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
     // 🧠 1. DETERMINEM EL CONCEPTE ACTUAL PER AL SCHEDULER
     const conceptId = getConceptIdForExercise(type, options);
 
-    // 🧠 2. CONSULTEM AL PORTER
-    const decision = retrievalScheduler.shouldBlockForEvocation(studentState, conceptId);
-    
-    if (decision.shouldTrigger) {
-      console.log(`🔒 BLOQUEIG ACTIU: ${decision.reason}`);
-      setIsEvocationRequired(true);
-      // Guardem el concepte que ha disparat el bloqueig
-      handleTriggerEvocationQuestion(decision.conceptToRetrieve);
-    } else {
+    // 🧠 2. CONSULTEM AL PORTER (omès si el bypass de dev és actiu)
+    if (bypassEvocation) {
       setIsEvocationRequired(false);
+    } else {
+      const decision = retrievalScheduler.shouldBlockForEvocation(studentState, conceptId);
+      if (decision.shouldTrigger) {
+        console.log(`🔒 BLOQUEIG ACTIU: ${decision.reason}`);
+        setIsEvocationRequired(true);
+        handleTriggerEvocationQuestion(decision.conceptToRetrieve);
+      } else {
+        setIsEvocationRequired(false);
+      }
     }
 
     // Enrich options with student profile so generators can personalise output
@@ -707,10 +712,25 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Pitàgores:</span>
            <button onClick={() => loadExercise("pythagoras", { level: "RIGHT_TRIANGLE_ID" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">🔺 Identifica</button>
+           <button onClick={() => loadExercise("pythagoras", { level: "HYPOTENUSE_ID" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">📐 Hipotenusa ID</button>
            <button onClick={() => loadExercise("pythagoras", { level: "PYTH_HYPOTENUSE" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">📐 Hipotenusa</button>
            <button onClick={() => loadExercise("pythagoras", { level: "PYTH_LEG" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">📏 Catet</button>
            <button onClick={() => loadExercise("pythagoras", { level: "PYTH_VERIFY" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">✓ Comprova</button>
            <button onClick={() => loadExercise("pythagoras", { level: "PYTH_CONTEXT" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">🏙 Aplicació</button>
+        </div>
+
+        {/* 🔬 DEV: bypass evocation gate */}
+        <div className="ml-auto">
+          <button
+            onClick={() => setBypassEvocation(v => !v)}
+            className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${
+              bypassEvocation
+                ? 'bg-red-600 text-white border-red-600 hover:bg-red-700'
+                : 'bg-white text-amber-700 border-amber-400 hover:bg-amber-50'
+            }`}
+          >
+            {bypassEvocation ? '🔬 Desactiva evocació' : '🔬 Mode test'}
+          </button>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import type { ExerciseInstance, AnswerEvaluationResult } from "../../../core/ExerciseEngine";
 import type { ExerciseStep, StepResult } from "../../../core/ExerciseSteps";
 import {
@@ -41,10 +41,11 @@ function renderGlossed(text: string): React.ReactNode {
 // ── Stepped UI ────────────────────────────────────────────────────────────────
 
 interface SteppedUIProps {
+  level: string;
   steps: ExerciseStep[];
   svgParams: Record<string, any>;
   svgRotation: 0 | 90 | 180 | 270;
-  correctAnswer: number; // exercise.solution.correct — the hypotenuse
+  correctAnswer: number;
   statementCatalan: string;
   statementTranslated: string | null;
   onAnswerChange: (answer: unknown) => void;
@@ -55,6 +56,7 @@ interface SteppedUIProps {
 }
 
 function SteppedUI({
+  level,
   steps,
   svgParams,
   svgRotation,
@@ -67,7 +69,9 @@ function SteppedUI({
   loadingEvaluation,
   onStepAttempt,
 }: SteppedUIProps) {
-  const [stepIndex,    setStepIndex]    = useState(0);
+  const [stepIndex,     setStepIndex]    = useState(0);
+  const [subStepIndex,  setSubStepIndex] = useState(0);
+  const [labelAnswers,  setLabelAnswers] = useState<Record<string, string>>({});
   const [stepAnswer,   setStepAnswer]   = useState<string | number | null>(null);
   const [fillVal1,     setFillVal1]     = useState('');
   const [fillVal2,     setFillVal2]     = useState('');
@@ -80,12 +84,55 @@ function SteppedUI({
   const collectedResults = useRef<StepResult[]>([]);
   const stepStartTime    = useRef<number>(Date.now());
 
-  const step       = steps[stepIndex];
-  const totalSteps = steps.length;
+  const step        = steps[stepIndex];
+  const totalSteps  = steps.length;
+  const isLabelStep = step.type === 'label_triangle';
 
   // Inputs are locked only when the current step was just answered correctly
-  // (during the 1500ms auto-advance delay). On wrong answers inputs stay active.
+  // (during the auto-advance delay). On wrong answers inputs stay active.
   const isLocked = stepFeedback === 'correct';
+
+  // Shuffle the label_triangle dropdown options once per step (keyed on step.id)
+  const shuffledLabelOptions = useMemo(() => {
+    if (step.type !== 'label_triangle' || !step.options) return [];
+    const arr = [...step.options];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.id]);
+
+  // For click_svg_sequence: use the active sub-step's instruction/hint
+  const currentInstruction = step.type === 'click_svg_sequence' && step.subSteps
+    ? (step.subSteps[subStepIndex]?.instruction ?? step.instruction)
+    : step.instruction;
+  const currentHint = step.type === 'click_svg_sequence' && step.subSteps
+    ? step.subSteps[subStepIndex]?.hint
+    : step.hint;
+
+  // ── Advance to the next main step (or complete) ─────────────────────────
+
+  function advanceMainStep() {
+    if (stepIndex + 1 < totalSteps) {
+      setStepIndex(i => i + 1);
+      setSubStepIndex(0);
+      setStepAnswer(null);
+      setFillVal1('');
+      setFillVal2('');
+      setLabelAnswers({});
+      setStepAttempts(0);
+      setShowHint(false);
+      setStepFeedback(null);
+      setShowCalc(false);
+      stepStartTime.current = Date.now();
+    } else {
+      setAllComplete(true);
+      onAnswerChange(correctAnswer);
+      onSubmit();
+    }
+  }
 
   // ── Evaluate current step ───────────────────────────────────────────────
 
@@ -95,12 +142,25 @@ function SteppedUI({
       case 'click_svg':
       case 'select_option':
         return String(stepAnswer) === String(step.correctAnswer);
+      case 'click_svg_sequence': {
+        const subStep = step.subSteps?.[subStepIndex];
+        if (!subStep) return false;
+        return String(stepAnswer) === String(subStep.correctAnswer);
+      }
+      case 'label_triangle':
+        return (step.labelOptions ?? []).every(o => labelAnswers[o.id] === o.correctValue);
       case 'fill_values': {
-        // correctAnswer stores "legA + legB" (raw leg values, order-independent)
-        const [e1, e2] = String(step.correctAnswer).split(' + ').map(parseFloat);
-        const v1 = parseFloat(fillVal1);
-        const v2 = parseFloat(fillVal2);
-        return (v1 === e1 && v2 === e2) || (v1 === e2 && v2 === e1);
+        const ca = String(step.correctAnswer);
+        if (ca.includes(' - ')) {
+          // order-fixed: first value is hypotenuse, second is known leg
+          const [e1, e2] = ca.split(' - ').map(parseFloat);
+          return parseFloat(fillVal1) === e1 && parseFloat(fillVal2) === e2;
+        } else {
+          // order-independent: '+' operator
+          const [e1, e2] = ca.split(' + ').map(parseFloat);
+          const v1 = parseFloat(fillVal1), v2 = parseFloat(fillVal2);
+          return (v1 === e1 && v2 === e2) || (v1 === e2 && v2 === e1);
+        }
       }
       case 'numeric_input':
         return Math.abs(Number(stepAnswer) - Number(step.correctAnswer)) <= 0.01;
@@ -109,6 +169,7 @@ function SteppedUI({
 
   function currentAnswer(): string | number {
     if (step.type === 'fill_values') return `${fillVal1} + ${fillVal2}`;
+    if (step.type === 'label_triangle') return JSON.stringify(labelAnswers);
     return stepAnswer ?? '';
   }
 
@@ -119,6 +180,34 @@ function SteppedUI({
     const correct = evaluateStep();
     const ans     = currentAnswer();
     const elapsed = Math.round((Date.now() - stepStartTime.current) / 1000);
+
+    // click_svg_sequence: manage sub-step progression separately
+    if (step.type === 'click_svg_sequence') {
+      if (correct) {
+        setStepFeedback('correct');
+        const isLastSubStep = subStepIndex >= (step.subSteps?.length ?? 1) - 1;
+        setTimeout(() => {
+          if (!isLastSubStep) {
+            setSubStepIndex(i => i + 1);
+            setStepAnswer(null);
+            setStepFeedback(null);
+            setShowHint(false);
+          } else {
+            collectedResults.current.push({
+              stepId: step.id, attempts: stepAttempts + 1, correct: true,
+              studentAnswer: ans, timeSeconds: elapsed,
+            });
+            onStepAttempt?.({ step, answer: ans, correct: true, attemptsOnStep: stepAttempts });
+            advanceMainStep();
+          }
+        }, 1000);
+      } else {
+        setStepAttempts(prev => prev + 1);
+        setStepFeedback('incorrect');
+        setShowHint(true);
+      }
+      return;
+    }
 
     collectedResults.current.push({
       stepId:        step.id,
@@ -132,27 +221,11 @@ function SteppedUI({
 
     if (correct) {
       setStepFeedback('correct');
-      setTimeout(() => {
-        if (stepIndex + 1 < totalSteps) {
-          setStepIndex(i => i + 1);
-          setStepAnswer(null);
-          setFillVal1('');
-          setFillVal2('');
-          setStepAttempts(0);
-          setShowHint(false);
-          setStepFeedback(null);
-          setShowCalc(false);
-          stepStartTime.current = Date.now();
-        } else {
-          setAllComplete(true);
-          onAnswerChange(correctAnswer);
-          onSubmit();
-        }
-      }, 1500);
+      setTimeout(() => advanceMainStep(), 1500);
     } else {
       setStepAttempts(prev => prev + 1);
       setStepFeedback('incorrect');
-      setShowHint(true); // always show hint on wrong, no attempt threshold
+      setShowHint(true);
     }
   }
 
@@ -188,7 +261,7 @@ function SteppedUI({
               legA={svgParams.legA}
               legB={svgParams.legB}
               hypotenuse={svgParams.hypotenuse}
-              unknownSide="hypotenuse"
+              unknownSide={svgParams.unknownSide as 'legA' | 'legB' | 'hypotenuse'}
               rotation={svgRotation}
               showRightAngle={step.id !== 'identify_right_angle'}
               stepMode={step.id === 'identify_right_angle' ? 'click_corner' : 'click_side'}
@@ -198,6 +271,57 @@ function SteppedUI({
             />
           </div>
         );
+
+      case 'click_svg_sequence':
+        return (
+          <div className="flex justify-center py-2">
+            <PythagorasTriangleSVG
+              legA={svgParams.legA}
+              legB={svgParams.legB}
+              hypotenuse={svgParams.hypotenuse}
+              unknownSide={svgParams.unknownSide as 'legA' | 'legB' | 'hypotenuse'}
+              rotation={svgRotation}
+              showRightAngle
+              stepMode="click_side"
+              onElementClick={isLocked ? undefined : (id) => setStepAnswer(id)}
+              selectedElement={stepAnswer as string | null}
+              correctElement={isLocked ? String(step.subSteps?.[subStepIndex]?.correctAnswer) : null}
+            />
+          </div>
+        );
+
+      case 'label_triangle': {
+        const opts = step.labelOptions ?? [];
+        return (
+          <div className="space-y-3">
+            {opts.map((opt) => {
+              const val      = labelAnswers[opt.id] ?? '';
+              const isWrong  = stepFeedback === 'incorrect' && val !== '' && val !== opt.correctValue;
+              const isRight  = isLocked && val === opt.correctValue;
+              return (
+                <div key={opt.id} className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm text-gray-600 w-52 shrink-0">{opt.displayName}:</span>
+                  <select
+                    value={val}
+                    onChange={e => !isLocked && setLabelAnswers(prev => ({ ...prev, [opt.id]: e.target.value }))}
+                    disabled={isLocked}
+                    className={`border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400 transition ${
+                      isRight  ? 'border-green-400 bg-green-50'
+                      : isWrong ? 'border-red-400 bg-red-50'
+                      : 'border-gray-300 bg-white'
+                    } disabled:cursor-not-allowed`}
+                  >
+                    <option value="">Selecciona...</option>
+                    {shuffledLabelOptions.map(v => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
 
       case 'select_option':
         return (
@@ -225,39 +349,39 @@ function SteppedUI({
           </div>
         );
 
-      case 'fill_values':
-        // Student enters raw leg values; UI shows them in the squared formula
+      case 'fill_values': {
+        const fillOp    = String(step.correctAnswer).includes(' - ') ? '-' : '+';
+        const fillLabel = step.fillLabel ?? 'c²';
+        const inputCls  = (locked: boolean, wrong: boolean) =>
+          `w-24 border rounded-lg px-3 py-2 text-center font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+            locked ? 'border-green-400 bg-green-50'
+            : wrong ? 'border-red-300 bg-red-50'
+            : 'border-gray-300'
+          }`;
         return (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-gray-700">c² =</span>
+            <span className="font-mono text-gray-700">{fillLabel} =</span>
             <input
               type="number"
               value={fillVal1}
               onChange={e => !isLocked && setFillVal1(e.target.value)}
               disabled={isLocked}
-              placeholder="a = ?"
-              className={`w-24 border rounded-lg px-3 py-2 text-center font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                isLocked                  ? 'border-green-400 bg-green-50'
-                : stepFeedback === 'incorrect' ? 'border-red-300 bg-red-50'
-                : 'border-gray-300'
-              }`}
+              placeholder="?"
+              className={inputCls(isLocked, stepFeedback === 'incorrect')}
             />
-            <span className="text-gray-500 font-bold">² +</span>
+            <span className="text-gray-500 font-bold">² {fillOp}</span>
             <input
               type="number"
               value={fillVal2}
               onChange={e => !isLocked && setFillVal2(e.target.value)}
               disabled={isLocked}
-              placeholder="b = ?"
-              className={`w-24 border rounded-lg px-3 py-2 text-center font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                isLocked                  ? 'border-green-400 bg-green-50'
-                : stepFeedback === 'incorrect' ? 'border-red-300 bg-red-50'
-                : 'border-gray-300'
-              }`}
+              placeholder="?"
+              className={inputCls(isLocked, stepFeedback === 'incorrect')}
             />
             <span className="text-gray-500 font-bold">²</span>
           </div>
         );
+      }
 
       case 'numeric_input':
         return (
@@ -307,9 +431,14 @@ function SteppedUI({
     if (isLocked) return false;
     switch (step.type) {
       case 'click_svg':
+      case 'click_svg_sequence':
       case 'select_option': return stepAnswer !== null;
       case 'fill_values':   return fillVal1 !== '' && fillVal2 !== '';
       case 'numeric_input': return stepAnswer !== null && stepAnswer !== '';
+      case 'label_triangle': {
+        const opts = step.labelOptions ?? [];
+        return opts.length > 0 && opts.every(o => (labelAnswers[o.id] ?? '') !== '');
+      }
     }
   })();
 
@@ -327,7 +456,7 @@ function SteppedUI({
             Teorema de Pitàgores
           </span>
           <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-            PYTH HYPOTENUSE
+            {level.replace(/_/g, ' ')}
           </span>
         </div>
 
@@ -353,9 +482,10 @@ function SteppedUI({
             legA={svgParams.legA}
             legB={svgParams.legB}
             hypotenuse={svgParams.hypotenuse}
-            unknownSide="hypotenuse"
+            unknownSide={svgParams.unknownSide as 'legA' | 'legB' | 'hypotenuse'}
             rotation={svgRotation}
             showRightAngle
+            showLabels={!isLabelStep}
           />
         </div>
       </div>
@@ -385,17 +515,17 @@ function SteppedUI({
       <div className="p-6">
 
         {/* Step instruction */}
-        <p className="text-base font-semibold text-gray-800 mb-4">
-          {step.instruction}
+        <p className="text-base font-semibold text-gray-800 mb-4 whitespace-pre-line">
+          {currentInstruction}
         </p>
 
         {/* Step-specific input */}
         {inputArea}
 
         {/* Hint — always shown after first wrong, stays visible on retries */}
-        {showHint && step.hint && (
+        {showHint && currentHint && (
           <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-            💡 {step.hint}
+            💡 {currentHint}
           </div>
         )}
 
@@ -455,6 +585,7 @@ export function PythagorasExercise({
       rawRotation === 90 ? 90 : rawRotation === 180 ? 180 : rawRotation === 270 ? 270 : 0;
     return (
       <SteppedUI
+        level={meta.level}
         steps={meta.steps!}
         svgParams={meta.svgParams}
         svgRotation={svgRotation}
@@ -519,7 +650,12 @@ export function PythagorasExercise({
       {meta.level === 'RIGHT_TRIANGLE_ID' && meta.svgParams?.triangles && (
         <div className="border-t border-gray-100 px-6 py-4 flex justify-center">
           <PythagorasIdentifySVG
-            triangles={meta.svgParams.triangles}
+            triangles={meta.svgParams.triangles.map((t: any, i: number) => ({
+              ...t,
+              rotation: Number(
+                ([meta.svgParams.t1rot, meta.svgParams.t2rot, meta.svgParams.t3rot] as number[])[i] ?? 0
+              ),
+            }))}
             selectedIndex={selectedTriangleIndex}
             showAnswer={evaluated}
             correctIndex={meta.svgParams.correctIndex}
