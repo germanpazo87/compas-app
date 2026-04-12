@@ -6,10 +6,13 @@ export interface ExerciseStep {
       | 'fill_values'        // student fills in blanks
       | 'numeric_input'      // student types a number
       | 'click_svg_sequence' // student makes multiple sequential SVG clicks
-      | 'label_triangle';    // student assigns values to triangle sides via dropdowns
+      | 'label_triangle'     // student assigns values to triangle sides via dropdowns
+      | 'label_segments'     // student assigns values to Tales diagram segments via dropdowns
+      | 'cross_product';     // student fills four blanks: [lhs1]·[lhs2]=[rhs1]·[rhs2]
   instruction: string;  // shown to student in Catalan (main step; for click_svg_sequence the active sub-step instruction overrides this)
   hint?: string;        // optional hint (for click_svg_sequence, use subSteps[i].hint instead)
   correctAnswer: string | number; // what constitutes a correct answer
+  correctAnswers?: string[];    // multiple valid answers (e.g. equivalent proportions)
   svgHighlight?: string; // which SVG element to highlight for this step
   options?: string[];   // choices for select_option steps
   fillLabel?: string;   // left-hand label for fill_values display, e.g. 'c²', 'b²', 'a²'
@@ -23,6 +26,17 @@ export interface ExerciseStep {
     displayName: string;   // e.g. 'Hipotenusa (escala)'
     correctValue: string;  // e.g. '5m' or 'x'
   }>;
+  segmentOptions?: Array<{ // segment-assignment options for label_segments
+    id: string;            // 'segmentA' | 'segmentB' | 'segmentC' | 'segmentD'
+    displayName: string;   // e.g. 'Segment a (esquerra, superior)'
+    correctValue: string;  // numeric string or 'x'
+  }>;
+  crossProductTemplate?: { // four fill-in values for cross_product: lhs1·lhs2 = rhs1·rhs2
+    lhs1: string;          // known value (e.g. '3')
+    lhs2: string;          // unknown position (always 'x')
+    rhs1: string;          // known value (e.g. '4')
+    rhs2: string;          // known value (e.g. '6')
+  };
 }
 
 export interface StepResult {

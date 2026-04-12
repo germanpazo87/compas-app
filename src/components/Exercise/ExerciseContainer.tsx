@@ -722,7 +722,10 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
         {/* 🔬 DEV: bypass evocation gate */}
         <div className="ml-auto">
           <button
-            onClick={() => setBypassEvocation(v => !v)}
+            onClick={() => setBypassEvocation(v => {
+              if (!v) setIsEvocationRequired(false);
+              return !v;
+            })}
             className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${
               bypassEvocation
                 ? 'bg-red-600 text-white border-red-600 hover:bg-red-700'

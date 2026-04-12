@@ -19,10 +19,10 @@ const C = {
 // ---------------------------------------------------------------------------
 
 export interface TalesClassicSVGProps {
-  segmentA: number;
-  segmentB: number;
-  segmentC: number;
-  segmentD: number;
+  segmentA: number | string;
+  segmentB: number | string;
+  segmentC: number | string;
+  segmentD: number | string;
   unknownField?: string;
 }
 
@@ -31,61 +31,110 @@ export function TalesClassicSVG({
 }: TalesClassicSVGProps) {
   const W = 400, H = 300;
   const Y_TOP = 40, Y_BOTTOM = 260;
-  const frac = segmentA / (segmentA + segmentB);
+  // Use numeric values for geometry; fall back to 6 when segment is 'x'
+  const numA = typeof segmentA === 'number' ? segmentA : 6;
+  const numB = typeof segmentB === 'number' ? segmentB : 6;
+  const frac = numA / (numA + numB);
   const Y_MID = Y_TOP + frac * (Y_BOTTOM - Y_TOP);
 
-  // Two secants
-  const L_TOP = { x: 90,  y: Y_TOP };
-  const L_BOT = { x: 130, y: Y_BOTTOM };
-  const R_TOP = { x: 270, y: Y_TOP };
-  const R_BOT = { x: 330, y: Y_BOTTOM };
+  // ── Convergent secant geometry ────────────────────────────────────────────
+  // Left secant fans left going down; right fans right going down.
+  // Both converge toward a vanishing point above the SVG (~200, -86).
+  const L_TOP = { x: 160, y: Y_TOP };
+  const L_BOT = { x: 90,  y: Y_BOTTOM };
+  const R_TOP = { x: 240, y: Y_TOP };
+  const R_BOT = { x: 310, y: Y_BOTTOM };
 
   const L_MID = { x: L_TOP.x + frac * (L_BOT.x - L_TOP.x), y: Y_MID };
   const R_MID = { x: R_TOP.x + frac * (R_BOT.x - R_TOP.x), y: Y_MID };
 
-  // Segment labels: midpoints offset away from centre
-  const labelA = { x: (L_TOP.x + L_MID.x) / 2 - 18, y: (Y_TOP    + Y_MID)    / 2 };
-  const labelB = { x: (L_MID.x + L_BOT.x) / 2 - 18, y: (Y_MID    + Y_BOTTOM) / 2 };
-  const labelC = { x: (R_TOP.x + R_MID.x) / 2 + 18, y: (Y_TOP    + Y_MID)    / 2 };
-  const labelD = { x: (R_MID.x + R_BOT.x) / 2 + 18, y: (Y_MID    + Y_BOTTOM) / 2 };
+  // Extend secants past the outermost parallels (visible within the viewBox)
+  const ext = 28;
+  const span = Y_BOTTOM - Y_TOP;
+  const L_EXT_T = { x: L_TOP.x - (ext / span) * (L_BOT.x - L_TOP.x), y: Y_TOP - ext };
+  const L_EXT_B = { x: L_BOT.x + (ext / span) * (L_BOT.x - L_TOP.x), y: Y_BOTTOM + ext };
+  const R_EXT_T = { x: R_TOP.x - (ext / span) * (R_BOT.x - R_TOP.x), y: Y_TOP - ext };
+  const R_EXT_B = { x: R_BOT.x + (ext / span) * (R_BOT.x - R_TOP.x), y: Y_BOTTOM + ext };
 
-  const colorD = unknownField === 'segmentD' ? C.unknown : C.primary;
+  // ── Segment label positions ───────────────────────────────────────────────
+  // Left labels offset left; right labels offset right — clear secant ownership
+  const OFF = 22;
+  const labelA = { x: (L_TOP.x + L_MID.x) / 2 - OFF, y: (L_TOP.y + L_MID.y) / 2 };
+  const labelB = { x: (L_MID.x + L_BOT.x) / 2 - OFF, y: (L_MID.y + L_BOT.y) / 2 };
+  const labelC = { x: (R_TOP.x + R_MID.x) / 2 + OFF, y: (R_TOP.y + R_MID.y) / 2 };
+  const labelD = { x: (R_MID.x + R_BOT.x) / 2 + OFF, y: (R_MID.y + R_BOT.y) / 2 };
+
+  // Any segment passed as the string 'x' renders in red
+  const colorA = segmentA === 'x' ? C.incorrect : C.primary;
+  const colorB = segmentB === 'x' ? C.incorrect : C.primary;
+  const colorC = segmentC === 'x' ? C.incorrect : C.primary;
+  const colorD = segmentD === 'x' ? C.incorrect : C.primary;
   const dots   = [L_TOP, L_MID, L_BOT, R_TOP, R_MID, R_BOT];
+
+  // Parallel line x span; arrowheads drawn as polygons at each end
+  const PAR_X1 = 20;
+  const PAR_X2 = 380;
+  const ARR = 8;   // arrowhead depth
+  const ARR_H = 4; // arrowhead half-height
+  const TICK_X = 200; // center tick position
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-md">
-      {/* Three parallel lines */}
+
+      {/* Three parallel lines — dashed with center ticks and end arrowheads */}
       {[Y_TOP, Y_MID, Y_BOTTOM].map((y, i) => (
         <g key={i}>
-          <line x1={40} y1={y} x2={360} y2={y} stroke={C.neutral} strokeWidth={1.5} />
-          {/* Double tick mark on left side */}
-          <line x1={52} y1={y - 5} x2={52} y2={y + 5} stroke={C.neutral} strokeWidth={1.5} />
-          <line x1={58} y1={y - 5} x2={58} y2={y + 5} stroke={C.neutral} strokeWidth={1.5} />
+          {/* Dashed line between arrowheads */}
+          <line
+            x1={PAR_X1 + ARR} y1={y} x2={PAR_X2 - ARR} y2={y}
+            stroke={C.neutral} strokeWidth={1.5} strokeDasharray="6 3"
+          />
+          {/* Left arrowhead (points left) */}
+          <polygon
+            points={`${PAR_X1},${y} ${PAR_X1 + ARR},${y - ARR_H} ${PAR_X1 + ARR},${y + ARR_H}`}
+            fill={C.neutral}
+          />
+          {/* Right arrowhead (points right) */}
+          <polygon
+            points={`${PAR_X2},${y} ${PAR_X2 - ARR},${y - ARR_H} ${PAR_X2 - ARR},${y + ARR_H}`}
+            fill={C.neutral}
+          />
+          {/* Double tick at centre */}
+          <line x1={TICK_X - 5} y1={y - 6} x2={TICK_X - 5} y2={y + 6}
+            stroke={C.neutral} strokeWidth={1.5} />
+          <line x1={TICK_X + 5} y1={y - 6} x2={TICK_X + 5} y2={y + 6}
+            stroke={C.neutral} strokeWidth={1.5} />
         </g>
       ))}
 
-      {/* Left secant */}
-      <line x1={L_TOP.x} y1={L_TOP.y} x2={L_BOT.x} y2={L_BOT.y}
-        stroke={C.primary} strokeWidth={2} />
-      {/* Right secant */}
-      <line x1={R_TOP.x} y1={R_TOP.y} x2={R_BOT.x} y2={R_BOT.y}
-        stroke={C.primary} strokeWidth={2} />
+      {/* Left secant — extended beyond parallels, clearly converging */}
+      <line x1={L_EXT_T.x} y1={L_EXT_T.y} x2={L_EXT_B.x} y2={L_EXT_B.y}
+        stroke={C.primary} strokeWidth={2.5} />
+      {/* Right secant — symmetric */}
+      <line x1={R_EXT_T.x} y1={R_EXT_T.y} x2={R_EXT_B.x} y2={R_EXT_B.y}
+        stroke={C.primary} strokeWidth={2.5} />
 
       {/* Intersection dots */}
       {dots.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r={4} fill={C.primary} />
       ))}
 
-      {/* Segment labels */}
+      {/* Segment labels — always visible; unknown segment shown in violet */}
       <text x={labelA.x} y={labelA.y} textAnchor="middle" dominantBaseline="middle"
-        fontSize={14} fontWeight="600" fill={C.primary}>a={segmentA}</text>
+        fontSize={14} fontWeight="600" fill={colorA}>
+        {segmentA === 'x' ? 'a=x' : `a=${segmentA}`}
+      </text>
       <text x={labelB.x} y={labelB.y} textAnchor="middle" dominantBaseline="middle"
-        fontSize={14} fontWeight="600" fill={C.primary}>b={segmentB}</text>
+        fontSize={14} fontWeight="600" fill={colorB}>
+        {segmentB === 'x' ? 'b=x' : `b=${segmentB}`}
+      </text>
       <text x={labelC.x} y={labelC.y} textAnchor="middle" dominantBaseline="middle"
-        fontSize={14} fontWeight="600" fill={C.primary}>c={segmentC}</text>
+        fontSize={14} fontWeight="600" fill={colorC}>
+        {segmentC === 'x' ? 'c=x' : `c=${segmentC}`}
+      </text>
       <text x={labelD.x} y={labelD.y} textAnchor="middle" dominantBaseline="middle"
         fontSize={14} fontWeight="600" fill={colorD}>
-        {unknownField === 'segmentD' ? 'x=?' : `d=${segmentD}`}
+        {segmentD === 'x' ? 'd=x' : `d=${segmentD}`}
       </text>
     </svg>
   );
@@ -98,65 +147,79 @@ export function TalesClassicSVG({
 // ---------------------------------------------------------------------------
 
 export interface TalesShadowSVGProps {
-  segmentA: number;        // height of first vertical  (small triangle height)
-  segmentB: number;        // extra height to second vertical top (total = A+B)
-  segmentC: number;        // horizontal distance from V to first vertical
-  segmentD: number | 'x';  // horizontal distance from V to second vertical
-  unknownField?: string;
+  segmentA: number | string;  // personHeight (height of first vertical)
+  segmentB: number | string;  // objectHeight - personHeight (extra height)
+  segmentC: number | string;  // personShadow (horizontal to first vertical)
+  segmentD: number | string;  // objectShadow (horizontal to second vertical)
 }
 
 export function TalesShadowSVG({
-  segmentA, segmentB, segmentC, segmentD, unknownField = 'segmentD',
+  segmentA, segmentB, segmentC, segmentD,
 }: TalesShadowSVGProps) {
   const V_X = 40, GROUND_Y = 260;
 
-  // Estimate segmentD when unknown (similar triangles: A/C = (A+B)/D)
-  const dVal = segmentD === 'x'
-    ? segmentC * (segmentA + segmentB) / segmentA
-    : segmentD;
+  // Numeric values for geometry — fall back to reasonable defaults when 'x'
+  const numA = typeof segmentA === 'number' ? segmentA : 1.8;
+  const numB = typeof segmentB === 'number' ? segmentB : numA * 10;
+  const numC = typeof segmentC === 'number' ? segmentC : 1.2;
+  // Estimate segmentD from proportion when unknown
+  const numD = typeof segmentD === 'number'
+    ? segmentD
+    : numC * (numA + numB) / numA;
 
   // Uniform scale: heights cap at 200px; horizontal capped to fit viewBox
   const s = Math.min(
-    200 / (segmentA + segmentB),
-    310 / dVal,               // 40 + 310 = 350, leaves margin for labels
+    200 / (numA + numB),
+    310 / numD,
   );
 
-  const x1 = V_X + segmentC * s;
-  const x2 = V_X + dVal * s;
-  const y1top  = GROUND_Y - segmentA * s;
-  const y2top  = GROUND_Y - (segmentA + segmentB) * s;
-  const yInner = y1top; // inner horizontal at height of first vertical
+  const x1 = V_X + numC * s;
+  const x2 = V_X + numD * s;
+  const y1top  = GROUND_Y - numA * s;
+  const y2top  = GROUND_Y - (numA + numB) * s;
+  const yInner = y1top;
 
-  const colorD = unknownField === 'segmentD' ? C.unknown : C.primary;
-  const SZ = 7; // right-angle marker size
+  // Color pairs: unknown always overrides to red
+  const personColor      = segmentA === 'x' ? C.incorrect : '#4f46e5'; // indigo
+  const personShadowColor = segmentC === 'x' ? C.incorrect : '#3b82f6'; // blue-500
+  const objectColor      = segmentB === 'x' ? C.incorrect : '#059669'; // emerald-600
+  const objectShadowColor = segmentD === 'x' ? C.incorrect : '#10b981'; // emerald-500
+
+  const SZ = 7;
 
   return (
-    <svg viewBox="0 0 400 300" className="w-full max-w-md">
+    <svg viewBox="0 0 400 310" className="w-full max-w-md">
       {/* Ground line */}
       <line x1={V_X} y1={GROUND_Y} x2={x2 + 16} y2={GROUND_Y}
         stroke={C.neutral} strokeWidth={2} />
 
-      {/* Hypotenuse: V → top of second vertical (passes through first top) */}
+      {/* Hypotenuse: V → top of second vertical */}
       <line x1={V_X} y1={GROUND_Y} x2={x2} y2={y2top}
         stroke={C.primary} strokeWidth={2} />
 
-      {/* Inner horizontal: top of first vertical → second vertical at same height */}
+      {/* Inner horizontal at first vertical's top height */}
       <line x1={x1} y1={yInner} x2={x2} y2={yInner}
         stroke={C.neutral} strokeWidth={1.5} strokeDasharray="5 3" />
 
-      {/* First vertical (parallel line 1) */}
+      {/* First vertical — personHeight */}
       <line x1={x1} y1={GROUND_Y} x2={x1} y2={y1top}
-        stroke={C.primary} strokeWidth={2} />
+        stroke={personColor} strokeWidth={2} />
 
-      {/* Second vertical (parallel line 2) */}
+      {/* Person shadow — ground segment V→x1 */}
+      <line x1={V_X} y1={GROUND_Y} x2={x1} y2={GROUND_Y}
+        stroke={personShadowColor} strokeWidth={3} />
+
+      {/* Second vertical — full objectHeight */}
       <line x1={x2} y1={GROUND_Y} x2={x2} y2={y2top}
-        stroke={colorD} strokeWidth={2} />
+        stroke={objectColor} strokeWidth={2} />
 
-      {/* Right-angle marker at base of first vertical (opens right) */}
+      {/* Object shadow — ground segment x1→x2 */}
+      <line x1={x1} y1={GROUND_Y} x2={x2} y2={GROUND_Y}
+        stroke={objectShadowColor} strokeWidth={3} />
+
+      {/* Right-angle markers */}
       <path d={`M ${x1} ${GROUND_Y - SZ} L ${x1 + SZ} ${GROUND_Y - SZ} L ${x1 + SZ} ${GROUND_Y}`}
         fill="none" stroke={C.neutral} strokeWidth={1.2} />
-
-      {/* Right-angle marker at base of second vertical (opens left) */}
       <path d={`M ${x2} ${GROUND_Y - SZ} L ${x2 - SZ} ${GROUND_Y - SZ} L ${x2 - SZ} ${GROUND_Y}`}
         fill="none" stroke={C.neutral} strokeWidth={1.2} />
 
@@ -166,40 +229,40 @@ export function TalesShadowSVG({
       <line x1={x1 - 6} y1={(GROUND_Y + y1top) / 2 + 5} x2={x1 + 6} y2={(GROUND_Y + y1top) / 2 + 5}
         stroke={C.neutral} strokeWidth={1.5} />
 
-      {/* Tick marks on second vertical (on lower portion, same height band) */}
+      {/* Tick marks on second vertical */}
       <line x1={x2 - 6} y1={(GROUND_Y + y1top) / 2 - 5} x2={x2 + 6} y2={(GROUND_Y + y1top) / 2 - 5}
         stroke={C.neutral} strokeWidth={1.5} />
       <line x1={x2 - 6} y1={(GROUND_Y + y1top) / 2 + 5} x2={x2 + 6} y2={(GROUND_Y + y1top) / 2 + 5}
         stroke={C.neutral} strokeWidth={1.5} />
 
       {/* Key point dots */}
-      <circle cx={V_X}  cy={GROUND_Y} r={5} fill={C.primary} />
-      <circle cx={x1}   cy={GROUND_Y} r={3} fill={C.primary} />
-      <circle cx={x1}   cy={y1top}    r={3} fill={C.primary} />
-      <circle cx={x2}   cy={GROUND_Y} r={3} fill={colorD} />
-      <circle cx={x2}   cy={y2top}    r={3} fill={colorD} />
-      <circle cx={x2}   cy={yInner}   r={3} fill={C.neutral} />
+      <circle cx={V_X} cy={GROUND_Y} r={5} fill={C.primary} />
+      <circle cx={x1}  cy={GROUND_Y} r={3} fill={personColor} />
+      <circle cx={x1}  cy={y1top}    r={3} fill={personColor} />
+      <circle cx={x2}  cy={GROUND_Y} r={3} fill={objectColor} />
+      <circle cx={x2}  cy={y2top}    r={3} fill={objectColor} />
+      <circle cx={x2}  cy={yInner}   r={3} fill={C.neutral} />
 
-      {/* segmentA label: left of first vertical, centred on its height */}
-      <text x={x1 - 10} y={(GROUND_Y + y1top) / 2}
-        textAnchor="end" dominantBaseline="middle"
-        fontSize={13} fontWeight="600" fill={C.primary}>a={segmentA}</text>
-
-      {/* segmentB label: left of second vertical, upper portion */}
-      <text x={x2 - 10} y={(y2top + yInner) / 2}
-        textAnchor="end" dominantBaseline="middle"
-        fontSize={13} fontWeight="600" fill={colorD}>b={segmentB}</text>
-
-      {/* segmentC label: below ground, between V and first vertical */}
-      <text x={(V_X + x1) / 2} y={GROUND_Y + 18}
-        textAnchor="middle" dominantBaseline="middle"
-        fontSize={13} fontWeight="600" fill={C.primary}>c={segmentC}</text>
-
-      {/* segmentD label: below ground, between first and second vertical */}
-      <text x={(x1 + x2) / 2} y={GROUND_Y + 18}
-        textAnchor="middle" dominantBaseline="middle"
-        fontSize={13} fontWeight="600" fill={colorD}>
-        {unknownField === 'segmentD' ? 'x=?' : `d=${segmentD}`}
+      {/* Labels — heights above ground, shadows below — no overlap possible */}
+      <text x={x1 + 10} y={(GROUND_Y + y1top) / 2}
+        textAnchor="start" dominantBaseline="middle"
+        fontSize={12} fontWeight="600" fill={personColor}>
+        {segmentA === 'x' ? 'persona: x' : `persona: ${segmentA}`}
+      </text>
+      <text x={x2 + 10} y={(GROUND_Y + y2top) / 2}
+        textAnchor="start" dominantBaseline="middle"
+        fontSize={12} fontWeight="600" fill={objectColor}>
+        {segmentB === 'x' ? 'objecte: x' : `objecte: ${segmentB}`}
+      </text>
+      <text x={(V_X + x1) / 2} y={GROUND_Y + 16}
+        textAnchor="middle" dominantBaseline="hanging"
+        fontSize={12} fontWeight="600" fill={personShadowColor}>
+        {segmentC === 'x' ? 'ombra p.: x' : `ombra p.: ${segmentC}`}
+      </text>
+      <text x={(x1 + x2) / 2} y={GROUND_Y + 30}
+        textAnchor="middle" dominantBaseline="hanging"
+        fontSize={12} fontWeight="600" fill={objectShadowColor}>
+        {segmentD === 'x' ? 'ombra obj.: x' : `ombra obj.: ${segmentD}`}
       </text>
     </svg>
   );
@@ -378,7 +441,6 @@ export function TalesDiagram(props: TalesDiagramProps) {
         segmentB={props.segmentB}
         segmentC={props.segmentC}
         segmentD={props.segmentD}
-        unknownField={props.unknownField}
       />
     );
   }

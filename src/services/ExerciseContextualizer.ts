@@ -60,9 +60,16 @@ const CONTEXT_CONSTRAINTS: Record<string, string> = {
     'The four values are distances along the two lines. ' +
     'Do NOT use people, time, rates or non-geometric proportions.',
   TALES_SHADOWS:
-    'The situation involves a person/object and their shadow. ' +
-    'Two vertical objects under parallel sun rays. ' +
-    'The values are heights and shadow lengths.',
+    'Two vertical objects casting shadows under parallel sun rays. ' +
+    'The four values are heights and shadow lengths. ' +
+    'CRITICAL: Use ONLY the exact numeric values provided in "Mathematical values" — ' +
+    'do NOT invent, round, or change any number. The statement must use these exact values verbatim. ' +
+    'Do NOT use named real buildings or monuments (Torre Agbar, Sagrada Família, etc.) — ' +
+    'their known heights contradict the exercise values. Use generic objects instead: ' +
+    'lamppost (fanal), flagpole (pal de bandera), tree (arbre), ' +
+    'traffic light (semàfor), antenna (antena), etc. ' +
+    'Use real Barcelona locations as setting (park, street, neighbourhood) ' +
+    'but generic objects as the measuring subjects.',
   TALES_SCALE:
     'The situation involves a map, blueprint or scale model and real measurements. ' +
     'One value is on the map/model, the other is the real measurement.',

@@ -57,25 +57,41 @@ function roundTo(n: number, decimals: number): number {
 // ---------------------------------------------------------------------------
 
 function generateTalesShadows(): ExerciseParams {
-  const MAX_RETRIES = 50;
-  const objectShadow = randomInt(10, 100);
+  const UNKNOWN_FIELDS = [
+    'personHeight', 'personShadow', 'objectHeight', 'objectShadow',
+  ] as const;
+  // Use clean discrete sets so all four derived values stay clean
+  const PH_VALUES = [1.5, 1.6, 1.8, 2.0] as const;
+  const PS_VALUES = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0] as const;
+  const MAX_RETRIES = 100;
 
   for (let i = 0; i < MAX_RETRIES; i++) {
-    const personHeight = randomFloat(1.5, 2.0, 1);
-    const personShadow = randomFloat(0.5, 3.0, 1);
-    const objectHeight = roundTo((personHeight * objectShadow) / personShadow, 1);
+    const personHeight  = randomFrom(PH_VALUES);
+    const personShadow  = randomFrom(PS_VALUES);
+    const objectShadow  = randomInt(10, 100);
+    const objectHeight  = roundTo((personHeight * objectShadow) / personShadow, 1);
 
-    if (objectHeight >= 5 && objectHeight <= 200) {
-      return {
-        type: 'TALES_SHADOWS',
-        values: { personHeight, personShadow, objectShadow, objectHeight },
-        unknownField: 'objectHeight',
-        preferredLanguage: 'ca',
-      };
-    }
+    if (!isCleanNumber(objectHeight) || objectHeight < 5 || objectHeight > 200) continue;
+
+    const unknownField = randomFrom(UNKNOWN_FIELDS);
+
+    // Unknown value must differ from all three known values
+    const vals = { personHeight, personShadow, objectHeight, objectShadow };
+    const answer = vals[unknownField];
+    const knowns = UNKNOWN_FIELDS
+      .filter(f => f !== unknownField)
+      .map(f => vals[f]);
+    if (knowns.includes(answer)) continue;
+
+    return {
+      type: 'TALES_SHADOWS',
+      values: { personHeight, personShadow, objectShadow, objectHeight },
+      unknownField,
+      preferredLanguage: 'ca',
+    };
   }
 
-  // Hard fallback: 1.8m person, 1.2m shadow, 20m object shadow → 30.0m object
+  // Hard fallback: pH=1.8, pS=1.2, oS=20 → oH=30
   return {
     type: 'TALES_SHADOWS',
     values: { personHeight: 1.8, personShadow: 1.2, objectShadow: 20, objectHeight: 30.0 },
@@ -120,29 +136,48 @@ function generateTalesScale(): ExerciseParams {
 }
 
 function generateTalesBasic(): ExerciseParams {
-  const MAX_RETRIES = 50;
+  const UNKNOWN_FIELDS = ['segmentA', 'segmentB', 'segmentC', 'segmentD'] as const;
+  const MAX_RETRIES = 100;
 
   for (let i = 0; i < MAX_RETRIES; i++) {
+    // Generate 4 integers with a·d = b·c
     const segmentA = randomInt(2, 12);
     const segmentB = randomInt(2, 12);
     const segmentC = randomInt(2, 12);
     const segmentD = (segmentB * segmentC) / segmentA;
 
-    if (isCleanNumber(segmentD)) {
-      return {
-        type: 'TALES_BASIC',
-        values: { segmentA, segmentB, segmentC, segmentD },
-        unknownField: 'segmentD',
-        preferredLanguage: 'ca',
-      };
-    }
+    if (!Number.isInteger(segmentD) || segmentD < 2 || segmentD > 20) continue;
+
+    // Reject degenerate/visually trivial cases
+    if (segmentA === segmentB) continue;  // first secant has equal halves
+    if (segmentC === segmentD) continue;  // second secant has equal halves
+    if (segmentA === segmentC) continue;  // top segments visually identical
+
+    const unknownField = randomFrom(UNKNOWN_FIELDS);
+
+    // Unknown value must differ from all three known values
+    const answer = unknownField === 'segmentA' ? segmentA
+                 : unknownField === 'segmentB' ? segmentB
+                 : unknownField === 'segmentC' ? segmentC
+                 : segmentD;
+    const known = [segmentA, segmentB, segmentC, segmentD].filter(
+      (_, idx) => ['segmentA','segmentB','segmentC','segmentD'][idx] !== unknownField
+    );
+    if (known.includes(answer)) continue;
+
+    return {
+      type: 'TALES_BASIC',
+      values: { segmentA, segmentB, segmentC, segmentD },
+      unknownField,
+      preferredLanguage: 'ca',
+    };
   }
 
-  // Hard fallback: a=4, b=6, c=2 → d=3
+  // Hard fallback: 3/4 = 6/8
   return {
     type: 'TALES_BASIC',
-    values: { segmentA: 4, segmentB: 6, segmentC: 2, segmentD: 3 },
-    unknownField: 'segmentD',
+    values: { segmentA: 3, segmentB: 4, segmentC: 6, segmentD: 8 },
+    unknownField: randomFrom(UNKNOWN_FIELDS),
     preferredLanguage: 'ca',
   };
 }
