@@ -157,6 +157,9 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
   // 🔬 DEV: bypass the evocation gate so exercises load immediately
   const [bypassEvocation, setBypassEvocation] = useState(false);
 
+  // 🗂️ NAV MODE: which exercise panel is visible
+  const [navMode, setNavMode] = useState<'adaptive' | 'manual' | 'beta'>('manual');
+
   // Sincronització amb el pare
   useEffect(() => {
     if (student) {
@@ -675,52 +678,31 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
         />
       }
     >
-      <div className="mb-6 bg-white p-3 rounded-xl shadow-sm border border-gray-200 flex flex-wrap items-center gap-4">
-        {/* Mode adaptatiu (guiat) */}
+      <div className="mb-6 bg-white p-3 rounded-xl shadow-sm border border-gray-200">
+
+        {/* ── Mode selector row ──────────────────────────────────────── */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Adaptatiu:</span>
-          <button onClick={() => loadGuidedExercise('thales')} className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition whitespace-nowrap">🎯 Tales (guiat)</button>
-          <button onClick={() => loadGuidedExercise('pythagoras')} className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition whitespace-nowrap">🎯 Pitàgores (guiat)</button>
-        </div>
-        <span className="text-xs text-gray-300">|</span>
+          {([
+            { id: 'adaptive', label: '🧭 Adaptatiu' },
+            { id: 'manual',   label: '📚 Manual'    },
+            { id: 'beta',     label: '🧪 Beta'       },
+          ] as { id: 'adaptive' | 'manual' | 'beta'; label: string }[]).map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setNavMode(id)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap ${
+                navMode === id
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
 
-        {/* Fraccions */}
-        <div className="flex items-center gap-3">
-           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Mòduls:</span>
-           <button onClick={() => loadExercise("fractions")} className="px-3 py-1.5 bg-gray-50 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 border border-gray-200 transition">🍰 Fraccions</button>
-        </div>
+          <div className="flex-1" />
 
-        {/* Estadística */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Estadística:</span>
-           <button onClick={() => loadExercise("statistics", { level: "CONCEPTUAL" })} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg hover:bg-indigo-100 border border-indigo-200 transition whitespace-nowrap">1. Conceptes</button>
-           <button onClick={() => loadExercise("statistics", { level: "BASIC_CALC" })} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg hover:bg-blue-100 border border-blue-200 transition whitespace-nowrap">2. Càlcul General</button>
-           <button onClick={() => loadExercise("statistics", { level: "MEDIAN_PRACTICE" })} className="px-3 py-1.5 bg-fuchsia-50 text-fuchsia-700 text-xs font-bold rounded-lg hover:bg-fuchsia-100 border border-fuchsia-200 ring-1 ring-fuchsia-300 transition whitespace-nowrap">🎯 Pràctica Mediana</button>
-           <button onClick={() => loadExercise("statistics", { level: "FREQ_TABLE" })} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg hover:bg-emerald-100 border border-emerald-200 transition whitespace-nowrap">4. Taules</button>
-           <button onClick={() => loadExercise("statistics", { level: "CRITICAL_THINKING" })} className="px-3 py-1.5 bg-purple-50 text-purple-700 text-xs font-bold rounded-lg hover:bg-purple-100 border border-purple-200 transition whitespace-nowrap">5. Crítica</button>
-        </div>
-
-        {/* Geometria — Tales */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Geometria:</span>
-           <button onClick={() => loadExercise("thales", { level: "TALES_BASIC" })} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg hover:bg-amber-100 border border-amber-200 transition whitespace-nowrap">📐 Tales bàsic</button>
-           <button onClick={() => loadExercise("thales", { level: "TALES_SHADOWS" })} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg hover:bg-amber-100 border border-amber-200 transition whitespace-nowrap">🌤 Ombres</button>
-           <button onClick={() => loadExercise("thales", { level: "TALES_SCALE" })} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg hover:bg-amber-100 border border-amber-200 transition whitespace-nowrap">🗺 Escales</button>
-        </div>
-
-        {/* Geometria — Pitàgores */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Pitàgores:</span>
-           <button onClick={() => loadExercise("pythagoras", { level: "RIGHT_TRIANGLE_ID" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">🔺 Identifica</button>
-           <button onClick={() => loadExercise("pythagoras", { level: "HYPOTENUSE_ID" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">📐 Hipotenusa ID</button>
-           <button onClick={() => loadExercise("pythagoras", { level: "PYTH_HYPOTENUSE" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">📐 Hipotenusa</button>
-           <button onClick={() => loadExercise("pythagoras", { level: "PYTH_LEG" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">📏 Catet</button>
-           <button onClick={() => loadExercise("pythagoras", { level: "PYTH_VERIFY" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">✓ Comprova</button>
-           <button onClick={() => loadExercise("pythagoras", { level: "PYTH_CONTEXT" })} className="px-3 py-1.5 bg-green-50 text-green-700 text-xs font-bold rounded-lg hover:bg-green-100 border border-green-200 transition whitespace-nowrap">🏙 Aplicació</button>
-        </div>
-
-        {/* 🔬 DEV: bypass evocation gate */}
-        <div className="ml-auto">
+          {/* 🔬 Mode test — always visible */}
           <button
             onClick={() => setBypassEvocation(v => {
               if (!v) setIsEvocationRequired(false);
@@ -734,6 +716,86 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
           >
             {bypassEvocation ? '🔬 Desactiva evocació' : '🔬 Mode test'}
           </button>
+        </div>
+
+        {/* ── Mode content ───────────────────────────────────────────── */}
+        <div className="mt-3">
+
+          {/* ADAPTATIU */}
+          {navMode === 'adaptive' && (
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={() => loadGuidedExercise('thales')}
+                className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 transition"
+              >
+                🎯 Tales
+              </button>
+              <button
+                onClick={() => loadGuidedExercise('pythagoras')}
+                className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 transition"
+              >
+                🎯 Pitàgores
+              </button>
+            </div>
+          )}
+
+          {/* MANUAL */}
+          {navMode === 'manual' && (
+            <div className="flex flex-wrap gap-5">
+              {/* Tales section */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tales</span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={() => loadExercise("thales", { level: "TALES_BASIC" })}   className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">📐 Tales bàsic</button>
+                  <button onClick={() => loadExercise("thales", { level: "TALES_SHADOWS" })} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🌤 Ombres</button>
+                  <button onClick={() => loadExercise("thales", { level: "TALES_SCALE" })}   className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🗺 Escales</button>
+                  <button onClick={() => loadExercise("thales", { level: "TALES_CONTEXT" })} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🏙 Aplicació</button>
+                </div>
+              </div>
+              {/* Pitàgores section */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Pitàgores</span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={() => loadExercise("pythagoras", { level: "RIGHT_TRIANGLE_ID" })} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-green-50 text-green-700 border-green-200 hover:bg-green-100">🔺 Identifica △</button>
+                  <button onClick={() => loadExercise("pythagoras", { level: "HYPOTENUSE_ID" })}     className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-green-50 text-green-700 border-green-200 hover:bg-green-100">📐 Identifica Hip.</button>
+                  <button onClick={() => loadExercise("pythagoras", { level: "PYTH_HYPOTENUSE" })}   className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-green-50 text-green-700 border-green-200 hover:bg-green-100">📏 Hipotenusa</button>
+                  <button onClick={() => loadExercise("pythagoras", { level: "PYTH_LEG" })}          className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-green-50 text-green-700 border-green-200 hover:bg-green-100">📏 Catet</button>
+                  <button onClick={() => loadExercise("pythagoras", { level: "PYTH_VERIFY" })}       className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-green-50 text-green-700 border-green-200 hover:bg-green-100">✓ Comprova</button>
+                  <button onClick={() => loadExercise("pythagoras", { level: "PYTH_CONTEXT" })}      className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-green-50 text-green-700 border-green-200 hover:bg-green-100">🏙 Aplicació</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BETA */}
+          {navMode === 'beta' && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 inline-block">
+                ⚠️ Exercicis en proves — no testats completament
+              </p>
+              <div className="flex flex-wrap gap-5">
+                {/* Estadística section */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Estadística</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button onClick={() => loadExercise("statistics", { level: "CONCEPTUAL" })}        className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100">📊 Conceptes</button>
+                    <button onClick={() => loadExercise("statistics", { level: "BASIC_CALC" })}        className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100">🔢 Càlcul</button>
+                    <button onClick={() => loadExercise("statistics", { level: "MEDIAN_PRACTICE" })}   className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100">📈 Mediana</button>
+                    <button onClick={() => loadExercise("statistics", { level: "FREQ_TABLE" })}        className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100">📋 Taules</button>
+                    <button onClick={() => loadExercise("statistics", { level: "CRITICAL_THINKING" })} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100">🧠 Crítica</button>
+                  </div>
+                </div>
+                {/* Fraccions section */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Fraccions</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button onClick={() => loadExercise("fractions")} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100">🍰 Fraccions</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 

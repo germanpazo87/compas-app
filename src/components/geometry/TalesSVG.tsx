@@ -412,15 +412,113 @@ export function TalesSimilarSVG({
 }
 
 // ---------------------------------------------------------------------------
+// TalesInaccessibleSVG — inaccessible distance diagram
+// Observer at V (bottom centre), two secants crossing an obstacle line,
+// reaching targets T1 and T2.  Proportion: seg1/seg2 = seg3/seg4.
+// Static layout — values are labels only; geometry never deforms.
+// ---------------------------------------------------------------------------
+
+export interface TalesInaccessibleSVGProps {
+  seg1: number | string;  // PA: observer P → stake A (left secant, near portion)
+  seg2: number | string;  // AB: stake A → stake B (horizontal span at obstacle level)
+  seg3: number | string;  // PC: observer P → target C (full left secant)
+  seg4: number | string;  // CD: target C → target D (inaccessible distance)
+  showLabels?: boolean;   // true (default): show numeric values; false: show names only
+}
+
+export function TalesInaccessibleSVG({ seg1, seg2, seg3, seg4, showLabels = true }: TalesInaccessibleSVGProps) {
+  // Static geometry — P1 and P2 are collinear secant intersections at OBS_Y.
+  // t = (285-145)/(285-45) = 7/12.
+  const P  = { x: 200, y: 285 };  // observer
+  const C_ = { x: 80,  y: 45  };  // near target  (C — underscore avoids clash with React)
+  const D  = { x: 320, y: 45  };  // far target
+  const A  = { x: 130, y: 145 };  // first stake  (P→C at OBS_Y: 200+7/12*(80-200)=130)
+  const B  = { x: 270, y: 145 };  // second stake (P→D at OBS_Y: 200+7/12*(320-200)=270)
+
+  const colPA = seg1 === 'x' ? C.incorrect : C.primary;
+  const colAB = seg2 === 'x' ? C.incorrect : C.primary;
+  const colPC = seg3 === 'x' ? C.incorrect : '#059669';
+  const colCD = seg4 === 'x' ? C.incorrect : '#059669';
+
+  // Segment label helpers
+  const lbl = (name: string, val: number | string) =>
+    val === 'x' ? 'x' : showLabels ? `${name}=${val}` : name;
+
+  // Midpoints for labels
+  const midPA = { x: (P.x + A.x) / 2, y: (P.y + A.y) / 2 };   // (165, 215)
+  const midPC = { x: (P.x + C_.x) / 2, y: (P.y + C_.y) / 2 }; // (140, 165)
+
+  return (
+    <svg viewBox="0 0 400 310" className="w-full max-w-md">
+
+      {/* Full secants P→C and P→D */}
+      <line x1={P.x} y1={P.y} x2={C_.x} y2={C_.y} stroke={C.primary} strokeWidth={2} />
+      <line x1={P.x} y1={P.y} x2={D.x}  y2={D.y}  stroke="#059669"   strokeWidth={2} />
+
+      {/* Inaccessible distance line C→D */}
+      <line x1={C_.x} y1={C_.y} x2={D.x} y2={D.y} stroke={colCD} strokeWidth={2.5} />
+
+      {/* Obstacle line — dashed across */}
+      <line x1={50} y1={A.y} x2={350} y2={B.y}
+        stroke={C.neutral} strokeWidth={1.5} strokeDasharray="8 4" />
+      <text x={355} y={A.y} dominantBaseline="middle"
+        fontSize={11} fontStyle="italic" fill={C.neutral}>obstacle</text>
+
+      {/* Key dots */}
+      {[P, C_, D, A, B].map((pt, i) => (
+        <circle key={i} cx={pt.x} cy={pt.y} r={4} fill={i < 3 ? C.primary : C.neutral} />
+      ))}
+
+      {/* Point labels P, C, D, A, B */}
+      <text x={P.x + 10}  y={P.y - 6}  textAnchor="start" dominantBaseline="middle"
+        fontSize={12} fontWeight="700" fill={C.text}>P</text>
+      <text x={C_.x}      y={C_.y - 12} textAnchor="middle"
+        fontSize={12} fontWeight="700" fill={C.primary}>C</text>
+      <text x={D.x}       y={D.y - 12}  textAnchor="middle"
+        fontSize={12} fontWeight="700" fill="#059669">D</text>
+      <text x={A.x - 10}  y={A.y}       textAnchor="end"   dominantBaseline="middle"
+        fontSize={11} fontWeight="600" fill={C.neutral}>A</text>
+      <text x={B.x + 10}  y={B.y}       textAnchor="start" dominantBaseline="middle"
+        fontSize={11} fontWeight="600" fill={C.neutral}>B</text>
+
+      {/* Segment label: PA — midpoint P→A, left of left secant */}
+      <text x={midPA.x - 14} y={midPA.y} textAnchor="end" dominantBaseline="middle"
+        fontSize={13} fontWeight="700" fill={colPA}>
+        {lbl('PA', seg1)}
+      </text>
+
+      {/* Segment label: AB — above obstacle line between A and B */}
+      <text x={(A.x + B.x) / 2} y={A.y - 10} textAnchor="middle"
+        fontSize={13} fontWeight="700" fill={colAB}>
+        {lbl('AB', seg2)}
+      </text>
+
+      {/* Segment label: PC — midpoint P→C, left of left secant (above PA, no overlap) */}
+      <text x={midPC.x - 14} y={midPC.y} textAnchor="end" dominantBaseline="middle"
+        fontSize={13} fontWeight="700" fill={colPC}>
+        {lbl('PC', seg3)}
+      </text>
+
+      {/* Segment label: CD — above C→D line */}
+      <text x={(C_.x + D.x) / 2} y={C_.y - 12} textAnchor="middle"
+        fontSize={13} fontWeight="700" fill={colCD}>
+        {lbl('CD', seg4)}
+      </text>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // TalesDiagram — unified dispatcher
 // ---------------------------------------------------------------------------
 
-export type TalesDiagramType = 'classic' | 'shadow' | 'similar';
+export type TalesDiagramType = 'classic' | 'shadow' | 'similar' | 'inaccessible';
 
 type TalesDiagramProps =
-  | ({ type: 'classic' } & TalesClassicSVGProps)
-  | ({ type: 'shadow'  } & TalesShadowSVGProps)
-  | ({ type: 'similar' } & TalesSimilarSVGProps);
+  | ({ type: 'classic'      } & TalesClassicSVGProps)
+  | ({ type: 'shadow'       } & TalesShadowSVGProps)
+  | ({ type: 'similar'      } & TalesSimilarSVGProps)
+  | ({ type: 'inaccessible' } & TalesInaccessibleSVGProps);
 
 export function TalesDiagram(props: TalesDiagramProps) {
   if (props.type === 'classic') {
@@ -441,6 +539,17 @@ export function TalesDiagram(props: TalesDiagramProps) {
         segmentB={props.segmentB}
         segmentC={props.segmentC}
         segmentD={props.segmentD}
+      />
+    );
+  }
+  if (props.type === 'inaccessible') {
+    return (
+      <TalesInaccessibleSVG
+        seg1={props.seg1}
+        seg2={props.seg2}
+        seg3={props.seg3}
+        seg4={props.seg4}
+        showLabels={props.showLabels}
       />
     );
   }

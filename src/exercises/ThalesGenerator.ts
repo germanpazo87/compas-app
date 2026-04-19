@@ -280,6 +280,248 @@ function buildTalesShadowsSteps(
 }
 
 // ---------------------------------------------------------------------------
+// Step builder for TALES_SCALE
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds 2 guided steps for TALES_SCALE:
+ *  1. select_option — identify the operation (multiply or divide)
+ *  2. numeric_input — calculate x
+ *
+ * direction is 'toReal' (mapMeasure → realMeasure) or
+ *              'toMap'  (realMeasure → mapMeasure).
+ */
+function buildTalesScaleSteps(
+  scale: number,
+  mapMeasure: number,
+  realMeasure: number,
+  direction: string,
+  _unknownField: string,
+): ExerciseStep[] {
+  const isToReal = direction === 'toReal';
+
+  // ── Step 1: operation identification ───────────────────────────────────
+  const correctOption = isToReal
+    ? "Multiplicar la mesura del plànol per l'escala"
+    : "Dividir la mesura real per l'escala";
+
+  const step1Options = isToReal
+    ? [
+        "Multiplicar la mesura del plànol per l'escala",
+        "Dividir la mesura del plànol per l'escala",
+        "Multiplicar l'escala per ella mateixa",
+      ]
+    : [
+        "Dividir la mesura real per l'escala",
+        "Multiplicar la mesura real per l'escala",
+        "Dividir l'escala per la mesura real",
+      ];
+
+  // Shuffle
+  const shuffled = [...step1Options];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  const step1Hint = isToReal
+    ? "Per passar del plànol a la realitat, multipliquem per l'escala: mesura_real = mesura_plànol × escala"
+    : "Per passar de la realitat al plànol, dividim per l'escala: mesura_plànol = mesura_real ÷ escala";
+
+  // ── Step 2: numeric calculation ─────────────────────────────────────────
+  const step2Instruction = isToReal
+    ? `Calcula la mesura real.\nmesura_real = mesura_plànol × escala\nx = ${mapMeasure} × ${scale} = ?`
+    : `Calcula la mesura al plànol.\nmesura_plànol = mesura_real ÷ escala\nx = ${realMeasure} ÷ ${scale} = ?`;
+
+  const step2Hint = isToReal
+    ? `Multiplica ${mapMeasure} per ${scale}.`
+    : `Divideix ${realMeasure} entre ${scale}.`;
+
+  const step2Answer = isToReal ? realMeasure : mapMeasure;
+
+  return [
+    {
+      id: 'scale_operation',
+      order: 1,
+      type: 'select_option',
+      instruction: 'Observa les dades. Quin càlcul has de fer?',
+      hint: step1Hint,
+      correctAnswer: correctOption,
+      correctAnswers: [correctOption],
+      options: shuffled,
+    },
+    {
+      id: 'scale_calculate',
+      order: 2,
+      type: 'numeric_input',
+      instruction: step2Instruction,
+      hint: step2Hint,
+      correctAnswer: step2Answer,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Step builder for TALES_CONTEXT
+// ---------------------------------------------------------------------------
+
+/** Field name → ordered position within the 4-segment proportion for each subtype. */
+const TALES_CONTEXT_FIELD_ORDER: Record<string, readonly string[]> = {
+  inaccessible_distance: ['stakeHeight', 'stakeShadow', 'objectDistance', 'measuredDistance'],
+};
+
+/** Short segment names used in proportion options and cross-product hints. */
+const TALES_CONTEXT_SHORT_LABELS: Record<string, readonly string[]> = {
+  inaccessible_distance: ['PA', 'AB', 'PC', 'CD'],
+};
+
+/**
+ * Builds 5 guided steps for TALES_CONTEXT (inaccessible_distance / building_height):
+ *  1. select_option  — confirm similar triangles
+ *  2. label_segments — assign 4 measurements to their segments
+ *  3. select_option  — identify the correct proportion
+ *  4. cross_product  — apply cross multiplication
+ *  5. numeric_input  — calculate x
+ *
+ * Proportion model: val1/val2 = val3/val4  →  val1·val4 = val2·val3
+ */
+function buildTalesContextSteps(
+  subtype: string,
+  val1: number, val2: number, val3: number, val4: number,
+  label1: string, label2: string, label3: string, label4: string,
+  unknownField: string,
+): ExerciseStep[] {
+  const fieldOrder = TALES_CONTEXT_FIELD_ORDER[subtype] ?? [];
+  const unkIdx = fieldOrder.indexOf(unknownField);
+  if (unkIdx === -1) throw new Error(`Unknown field '${unknownField}' for subtype '${subtype}'`);
+
+  const numVals  = [val1, val2, val3, val4];
+  const labels   = [label1, label2, label3, label4];
+
+  // Display values — unknown becomes 'x'
+  const disp = numVals.map((v, i) => (i === unkIdx ? 'x' : String(v)));
+  const [v1, v2, v3, v4] = disp;
+
+  // Numeric answer
+  const answer = numVals[unkIdx];
+
+  // ── Step 1 hint (varies by subtype) ────────────────────────────────────
+  const step1Hint = subtype === 'inaccessible_distance'
+    ? 'Les estaques i les seves distàncies formen triangles semblants perquè mantenen la mateixa proporció.'
+    : "El pal de referència i l'edifici formen triangles semblants amb les seves distàncies.";
+
+  // ── Step 2: label_segments ──────────────────────────────────────────────
+  const segmentOptions = numVals.map((_, i) => ({
+    id:           fieldOrder[i],
+    displayName:  labels[i],
+    correctValue: disp[i],
+  }));
+
+  // ── Step 3: proportion options — use short segment names (PA/AB/PC/CD) ──
+  const shortLbls = TALES_CONTEXT_SHORT_LABELS[subtype] ?? ['s1', 's2', 's3', 's4'];
+  const [sA, sB, sC, sD] = shortLbls;  // PA, AB, PC, CD
+
+  const prop1 = `${sA}/${sB} = ${sC}/${sD}`;
+  const prop2 = `${sA}/${sC} = ${sB}/${sD}`;
+  const prop3 = `${sB}/${sA} = ${sD}/${sC}`;
+  const prop4 = `${sC}/${sA} = ${sD}/${sB}`;
+  const distractor1 = `${sA}/${sD} = ${sB}/${sC}`;
+  const distractor2 = `${sB}/${sC} = ${sA}/${sD}`;
+
+  const propOptions = [prop1, prop2, distractor1, distractor2];
+  for (let i = propOptions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [propOptions[i], propOptions[j]] = [propOptions[j], propOptions[i]];
+  }
+
+  // ── Step 4: cross_product ───────────────────────────────────────────────
+  // val1·val4 = val2·val3 (PA·CD = AB·PC) — 'x' goes in the unknown slot
+  let lhs1: string, lhs2: string, rhs1: string, rhs2: string;
+  if      (unkIdx === 0) { lhs1 = 'x'; lhs2 = v4; rhs1 = v2; rhs2 = v3; }
+  else if (unkIdx === 1) { lhs1 = v1;  lhs2 = v4; rhs1 = 'x'; rhs2 = v3; }
+  else if (unkIdx === 2) { lhs1 = v1;  lhs2 = v4; rhs1 = v2;  rhs2 = 'x'; }
+  else                   { lhs1 = v1;  lhs2 = 'x'; rhs1 = v2; rhs2 = v3; }
+
+  const crossHint =
+    `El producte creuat: ${sA}·${sD} = ${sB}·${sC}. ` +
+    `Substitueix els valors coneguts: ${lhs1}·${lhs2} = ${rhs1}·${rhs2}`;
+
+  // ── Step 5: arithmetic instruction ─────────────────────────────────────
+  // Isolate x: lhsKnown·x = rhsA·rhsB
+  let lhsKnown: number, rhsA: number, rhsB: number;
+  if      (unkIdx === 0) { lhsKnown = val4; rhsA = val2; rhsB = val3; }
+  else if (unkIdx === 1) { lhsKnown = val3; rhsA = val1; rhsB = val4; }
+  else if (unkIdx === 2) { lhsKnown = val2; rhsA = val1; rhsB = val4; }
+  else                   { lhsKnown = val1; rhsA = val2; rhsB = val3; }
+
+  const rhsProduct = Math.round(rhsA * rhsB * 100) / 100;
+  // Known multiplier segment name (the non-x side of the cross product lhs)
+  const knownSeg = [sA, sB, sC, sD][unkIdx === 0 ? 3 : unkIdx === 1 ? 2 : unkIdx === 2 ? 1 : 0];
+  const step5Instruction =
+    `De ${sA}·${sD} = ${sB}·${sC}, has trobat que ${knownSeg}·x = ${rhsA}·${rhsB} = ${rhsProduct}.\n` +
+    `Per trobar x, divideix ${rhsProduct} entre ${lhsKnown}:\n` +
+    `x = ${rhsProduct} ÷ ${lhsKnown} = ?`;
+
+  return [
+    // Step 1 — Similar triangles
+    {
+      id: 'context_similar_triangles',
+      order: 1,
+      type: 'select_option',
+      instruction:
+        'Els dos triangles formats per les mesures de referència i les distàncies, ' +
+        'són triangles semblants?',
+      hint: step1Hint,
+      correctAnswer: 'Sí, són semblants',
+      correctAnswers: ['Sí, són semblants'],
+      options: ['Sí, són semblants', 'No, no són semblants'],
+    },
+    // Step 2 — Label segments
+    {
+      id: 'context_label_segments',
+      order: 2,
+      type: 'label_segments',
+      instruction: "Identifica cada mesura de l'enunciat i assigna-la al segment corresponent.",
+      hint: "Llegeix l'enunciat amb atenció. Cada mesura correspon a un element concret del problema.",
+      correctAnswer: `${v1}|${v2}|${v3}|${v4}`,
+      segmentOptions,
+    },
+    // Step 3 — Proportion
+    {
+      id: 'context_proportion',
+      order: 3,
+      type: 'select_option',
+      instruction: 'Escriu la proporció correcta entre les mesures dels dos triangles semblants.',
+      hint: 'Els elements corresponents dels dos triangles semblants han de guardar la mateixa proporció.',
+      correctAnswer: prop1,
+      correctAnswers: [prop1, prop2, prop3, prop4],
+      options: propOptions,
+    },
+    // Step 4 — Cross product
+    {
+      id: 'context_cross_product',
+      order: 4,
+      type: 'cross_product',
+      instruction:
+        'Aplica el producte en creu:\n' +
+        '[ ]·[ ] = [ ]·[ ]\n' +
+        'Omple els quatre buits amb els valors corresponents.',
+      hint: crossHint,
+      correctAnswer: `${lhs1}|${lhs2}|${rhs1}|${rhs2}`,
+      crossProductTemplate: { lhs1, lhs2, rhs1, rhs2 },
+    },
+    // Step 5 — Calculate
+    {
+      id: 'context_calculate',
+      order: 5,
+      type: 'numeric_input',
+      instruction: step5Instruction,
+      correctAnswer: answer,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 
 let _instanceCounter = 0;
 
@@ -370,7 +612,49 @@ export class ThalesGenerator implements ExerciseGenerator {
       },
     };
 
-    // 5. Inject guided steps for TALES_SHADOWS post-LLM
+    // 5a. Inject guided steps for TALES_CONTEXT post-LLM
+    if (level === 'TALES_CONTEXT') {
+      const v   = params.values as any;
+      const sub = String(v.subtype);
+      const meta = instance.metadata as Record<string, any>;
+
+      if (sub === 'inaccessible_distance') {
+        const uf = params.unknownField ?? 'objectDistance';
+        meta.diagramType = 'inaccessible';
+        meta.svgParams = {
+          seg1: uf === 'stakeHeight'      ? 'x' : v.stakeHeight,
+          seg2: uf === 'stakeShadow'      ? 'x' : v.stakeShadow,
+          seg3: uf === 'objectDistance'   ? 'x' : v.objectDistance,
+          seg4: uf === 'measuredDistance' ? 'x' : v.measuredDistance,
+        };
+        meta.steps = buildTalesContextSteps(
+          sub,
+          Number(v.stakeHeight), Number(v.stakeShadow),
+          Number(v.objectDistance), Number(v.measuredDistance),
+          'Segment PA (P → A)', 'Segment AB (A → B)',
+          'Segment PC (P → C)', 'Segment CD (C → D)',
+          uf,
+        );
+        meta.currentStepIndex = 0;
+      }
+      // building_height removed; map_planning uses TALES_SCALE
+    }
+
+    // 5b. Inject guided steps for TALES_SCALE post-LLM
+    if (level === 'TALES_SCALE') {
+      const v = params.values as any;
+      const meta = instance.metadata as Record<string, any>;
+      meta.steps = buildTalesScaleSteps(
+        Number(v.scale),
+        Number(v.mapMeasure),
+        Number(v.realMeasure),
+        String(v.direction),
+        params.unknownField ?? 'realMeasure',
+      );
+      meta.currentStepIndex = 0;
+    }
+
+    // 5b. Inject guided steps for TALES_SHADOWS post-LLM
     if (level === 'TALES_SHADOWS') {
       const v = params.values as {
         personHeight: number; personShadow: number;

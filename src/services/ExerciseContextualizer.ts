@@ -71,10 +71,25 @@ const CONTEXT_CONSTRAINTS: Record<string, string> = {
     'Use real Barcelona locations as setting (park, street, neighbourhood) ' +
     'but generic objects as the measuring subjects.',
   TALES_SCALE:
-    'The situation involves a map, blueprint or scale model and real measurements. ' +
-    'One value is on the map/model, the other is the real measurement.',
+    'Map or scale model problem. ' +
+    'CRITICAL: use ONLY the exact numeric values provided — do NOT change any number. ' +
+    'One value is on the map/blueprint, the other is real. ' +
+    'Use Barcelona locations as context but do not invent measurements for known real places.',
   TALES_CONTEXT:
-    'Mixed application. Use the subtype field in values to determine the context.',
+    'Inaccessible distance problem using similar triangles. ' +
+    'MANDATORY NOMENCLATURE — always use exactly these names: ' +
+    'P = the observer, A = first stake, B = second stake, ' +
+    'C = near target point, D = far target point. ' +
+    'The observer P places stakes at A and B. ' +
+    'The inaccessible distance is between C and D. ' +
+    'Segments: PA = stakeHeight, AB = stakeShadow, PC = objectDistance, CD = measuredDistance ' +
+    '(the unknown is marked as x). ' +
+    'The statement must reference P, A, B, C, D explicitly. ' +
+    'NEVER use different point names. ' +
+    'NEVER describe shadows, heights or sun rays. ' +
+    'CRITICAL: use ONLY the exact numeric values provided. ' +
+    'Use Barcelona obstacles: Besòs river, Llobregat, ' +
+    'a wide avenue, railway tracks, park paths, etc.',
   PYTH_HYPOTENUSE:
     'The situation involves a right triangle. Two legs are known; the student must find the hypotenuse ' +
     'using the Pythagorean theorem (a² + b² = c²). Use a realistic Barcelona context ' +

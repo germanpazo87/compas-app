@@ -183,64 +183,59 @@ function generateTalesBasic(): ExerciseParams {
 }
 
 function generateTalesContext(subtype?: TalesContextSubtype): ExerciseParams {
-  const SUBTYPES: readonly TalesContextSubtype[] = [
-    'inaccessible_distance',
-    'building_height',
-    'map_planning',
-  ];
+  // Only inaccessible_distance is active — building_height removed, map_planning uses TALES_SCALE
+  const SUBTYPES: readonly TalesContextSubtype[] = ['inaccessible_distance'];
   const selected: TalesContextSubtype = subtype ?? randomFrom(SUBTYPES);
-  const MAX_RETRIES = 50;
+  const MAX_RETRIES = 100;
+
+  if (selected === 'map_planning') {
+    throw new Error('map_planning is not implemented in generateTalesContext — use TALES_SCALE instead');
+  }
+  if (selected === 'building_height') {
+    throw new Error('building_height is not implemented in generateTalesContext — removed');
+  }
 
   switch (selected) {
     case 'inaccessible_distance': {
-      const stakeHeight  = randomInt(1, 3);
-      const stakeShadow  = randomFloat(0.5, 2.0, 1);
-      const objectShadow = randomInt(20, 100);
-      const objectDistance = roundTo((stakeHeight * objectShadow) / stakeShadow, 1);
+      // Proportion: stakeHeight / stakeShadow = objectDistance / measuredDistance
+      // Generate all 4 as clean integers: pick 3, derive the 4th.
+      const UNKNOWN_FIELDS = [
+        'stakeHeight', 'stakeShadow', 'objectDistance', 'measuredDistance',
+      ] as const;
+
+      for (let i = 0; i < MAX_RETRIES; i++) {
+        const stakeHeight      = randomInt(1, 5);
+        const stakeShadow      = randomInt(1, 5);
+        const measuredDistance = randomInt(5, 30);
+        const objectDistance   = (stakeHeight * measuredDistance) / stakeShadow;
+
+        if (!Number.isInteger(objectDistance) || objectDistance < 1 || objectDistance > 200) continue;
+
+        // Reject if any two of the four values are equal
+        const vals = [stakeHeight, stakeShadow, objectDistance, measuredDistance];
+        if (new Set(vals).size < 4) continue;
+
+        const unknownField = randomFrom(UNKNOWN_FIELDS);
+        return {
+          type: 'TALES_CONTEXT',
+          values: { subtype: 'inaccessible_distance', stakeHeight, stakeShadow, objectDistance, measuredDistance },
+          unknownField,
+          preferredLanguage: 'ca',
+        };
+      }
+      // Hard fallback: 3/2 = 18/12  (all distinct, integer cross-product)
       return {
         type: 'TALES_CONTEXT',
-        values: { subtype: 'inaccessible_distance', stakeHeight, stakeShadow, objectShadow, objectDistance },
+        values: { subtype: 'inaccessible_distance', stakeHeight: 3, stakeShadow: 2, objectDistance: 18, measuredDistance: 12 },
         unknownField: 'objectDistance',
         preferredLanguage: 'ca',
       };
     }
 
-    case 'building_height': {
-      for (let i = 0; i < MAX_RETRIES; i++) {
-        const referenceHeight = randomInt(3, 10);
-        const referenceShadow = randomFloat(2, 10, 1);
-        const buildingShadow  = randomInt(5, 50);
-        const buildingHeight  = roundTo((referenceHeight * buildingShadow) / referenceShadow, 1);
-
-        if (buildingHeight >= 5 && buildingHeight <= 150) {
-          return {
-            type: 'TALES_CONTEXT',
-            values: { subtype: 'building_height', referenceHeight, referenceShadow, buildingShadow, buildingHeight },
-            unknownField: 'buildingHeight',
-            preferredLanguage: 'ca',
-          };
-        }
-      }
-      // Hard fallback: 5m reference, 4.0m shadow, 20m building shadow → 25.0m
-      return {
-        type: 'TALES_CONTEXT',
-        values: { subtype: 'building_height', referenceHeight: 5, referenceShadow: 4.0, buildingShadow: 20, buildingHeight: 25.0 },
-        unknownField: 'buildingHeight',
-        preferredLanguage: 'ca',
-      };
-    }
-
-    case 'map_planning': {
-      const planScale  = randomFrom([50, 100, 200] as const);
-      const planLength = randomInt(5, 30);   // cm on the plan
-      const realLength = planLength * planScale; // cm in reality (LLM converts units in narrative)
-      return {
-        type: 'TALES_CONTEXT',
-        values: { subtype: 'map_planning', planScale, planLength, realLength },
-        unknownField: 'realLength',
-        preferredLanguage: 'ca',
-      };
-    }
+    case 'building_height':
+    case 'map_planning':
+      // Guards above handle these; branches satisfy TypeScript exhaustiveness.
+      throw new Error(`Subtype '${selected}' is not handled by generateTalesContext`);
   }
 }
 

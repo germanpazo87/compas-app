@@ -26,7 +26,7 @@ interface ThalesExerciseProps {
 interface TalesSteppedUIProps {
   steps: ExerciseStep[];
   svgParams: Record<string, any>;
-  diagramType: string;
+  diagramType: string | null;
   statementCatalan: string;
   statementTranslated: string | null;
   correctAnswer: number;
@@ -68,10 +68,10 @@ function TalesSteppedUI({
   const totalSteps = steps.length;
   const isLocked   = stepFeedback === 'correct';
 
-  // Reveal the unknown value in the SVG once the student has passed the
-  // identification steps: for shadows (step 0 = triangles, 1 = labels)
-  // reveal from step 2 onwards; for classic (no label step) always reveal.
-  const revealThreshold = diagramType === 'shadow' ? steps.length : 0;
+  // Reveal the unknown value in the SVG from step 3 (proportion) onwards.
+  // For shadow and inaccessible: steps 1-2 are identification/labelling —
+  // keep 'x' hidden until step 3 (index 2). For classic: always reveal.
+  const revealThreshold = (diagramType === 'shadow' || diagramType === 'inaccessible') ? 2 : 0;
   const showActualValues = stepIndex >= revealThreshold;
   const displaySvgParams = showActualValues
     ? {
@@ -80,6 +80,10 @@ function TalesSteppedUI({
         segmentB: svgParams.segmentB === 'x' ? correctAnswer : svgParams.segmentB,
         segmentC: svgParams.segmentC === 'x' ? correctAnswer : svgParams.segmentC,
         segmentD: svgParams.segmentD === 'x' ? correctAnswer : svgParams.segmentD,
+        seg1: svgParams.seg1 === 'x' ? correctAnswer : svgParams.seg1,
+        seg2: svgParams.seg2 === 'x' ? correctAnswer : svgParams.seg2,
+        seg3: svgParams.seg3 === 'x' ? correctAnswer : svgParams.seg3,
+        seg4: svgParams.seg4 === 'x' ? correctAnswer : svgParams.seg4,
       }
     : svgParams;
 
@@ -393,16 +397,16 @@ function TalesSteppedUI({
           </div>
         )}
 
-        {/* Reference SVG — unknown revealed once identification steps are complete */}
-        <div className="flex justify-center">
-          <TalesDiagram
-            type={diagramType as any}
-            segmentA={displaySvgParams.segmentA}
-            segmentB={displaySvgParams.segmentB}
-            segmentC={displaySvgParams.segmentC}
-            segmentD={displaySvgParams.segmentD}
-          />
-        </div>
+        {/* Reference SVG — only rendered when a diagram type is defined */}
+        {diagramType && (
+          <div className="flex justify-center">
+            <TalesDiagram {...({
+              type: diagramType,
+              ...displaySvgParams,
+              ...(diagramType === 'inaccessible' ? { showLabels: showActualValues } : {}),
+            } as any)} />
+          </div>
+        )}
       </div>
 
       {/* ── PROGRESS BAR ─────────────────────────────────────────────────── */}
@@ -505,7 +509,7 @@ export function ThalesExercise({
       <TalesSteppedUI
         steps={meta.steps!}
         svgParams={meta.svgParams}
-        diagramType={meta.diagramType ?? 'classic'}
+        diagramType={meta.diagramType}
         correctAnswer={(exercise.solution as { correct: number }).correct}
         statementCatalan={meta.statementCatalan ?? ''}
         statementTranslated={meta.statementTranslated ?? null}
