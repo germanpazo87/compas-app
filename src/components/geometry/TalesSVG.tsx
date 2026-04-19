@@ -346,6 +346,7 @@ function TriangleShape({ sides, cx, cy, color }: TriangleShapeProps) {
 
 export interface TrianglePair {
   sides: [number, number, number];
+  sides2?: [number, number, number];  // second triangle in the pair (for SIMILAR_ID)
   label?: string;
 }
 
@@ -364,17 +365,25 @@ export function TalesSimilarSVG({
   areSimilar,
   onSelect,
 }: TalesSimilarSVGProps) {
-  const W = 600, H = 300;
-  const centres: [number, number][] = [[150, 148], [450, 148]];
+  const W = 600;
+  const hasPairs = pairs.some(p => p.sides2 != null);
+  const H = hasPairs ? 320 : 300;
+
+  // When showing two triangles per half, offset each vertically
+  const centres: [number, number][] = hasPairs
+    ? [[150, 80], [450, 80]]
+    : [[150, 148], [450, 148]];
+  const centres2: [number, number][] = [[150, 228], [450, 228]];
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-2xl">
       {/* Centre divider */}
-      <line x1={300} y1={8} x2={300} y2={292}
+      <line x1={300} y1={8} x2={300} y2={H - 8}
         stroke={C.neutral} strokeWidth={1} strokeDasharray="5 4" />
 
       {pairs.map((pair, i) => {
         const [cx, cy] = centres[i];
+        const [cx2, cy2] = centres2[i];
         let color = C.primary;
         if (showAnswer && areSimilar) {
           color = areSimilar[i] ? C.correct : C.incorrect;
@@ -383,6 +392,7 @@ export function TalesSimilarSVG({
         }
 
         const halfX = i === 0 ? 5 : 305;
+        const highlightH = hasPairs ? 310 : 290;
 
         return (
           <g
@@ -392,14 +402,25 @@ export function TalesSimilarSVG({
           >
             {/* Selection highlight */}
             {selected === i && (
-              <rect x={halfX} y={5} width={290} height={290}
+              <rect x={halfX} y={5} width={290} height={highlightH}
                 rx={8} fill="none"
                 stroke={color} strokeWidth={2} strokeDasharray="6 3"
               />
             )}
+            {/* First triangle */}
             <TriangleShape sides={pair.sides} cx={cx} cy={cy} color={color} />
+            {/* Second triangle + separator (when pair mode) */}
+            {pair.sides2 && (
+              <>
+                <line
+                  x1={halfX + 10} y1={155} x2={halfX + 280} y2={155}
+                  stroke={C.neutral} strokeWidth={0.8} strokeDasharray="3 3"
+                />
+                <TriangleShape sides={pair.sides2} cx={cx2} cy={cy2} color={color} />
+              </>
+            )}
             {pair.label && (
-              <text x={cx} y={cy + 112}
+              <text x={cx} y={hasPairs ? cy2 + 78 : cy + 112}
                 textAnchor="middle" fontSize={12} fill={C.text} fontWeight="600">
                 {pair.label}
               </text>
@@ -509,16 +530,119 @@ export function TalesInaccessibleSVG({ seg1, seg2, seg3, seg4, showLabels = true
 }
 
 // ---------------------------------------------------------------------------
+// TalesTriangleSVG — classic Tales triangle configuration
+// Single vertex at top, two rays extending down, two horizontal parallels.
+// Segments: a (left ray upper), b (left ray lower),
+//           c (right ray upper), d (right ray lower).
+// ---------------------------------------------------------------------------
+
+export interface TalesTriangleSVGProps {
+  segmentA: number | string;
+  segmentB: number | string;
+  segmentC: number | string;
+  segmentD: number | string;
+  highlightUnknown?: boolean;
+  showLabels?: boolean;
+}
+
+export function TalesTriangleSVG({
+  segmentA, segmentB, segmentC, segmentD, showLabels = true,
+}: TalesTriangleSVGProps) {
+  const V  = { x: 200, y: 30  };
+  const L2 = { x: 60,  y: 270 };
+  const R2 = { x: 340, y: 270 };
+
+  const numA = typeof segmentA === 'number' ? segmentA : 6;
+  const numB = typeof segmentB === 'number' ? segmentB : 6;
+  const frac = numA / (numA + numB);
+
+  const L1 = { x: V.x + frac * (L2.x - V.x), y: V.y + frac * (L2.y - V.y) };
+  const R1 = { x: V.x + frac * (R2.x - V.x), y: V.y + frac * (R2.y - V.y) };
+
+  const colorA = segmentA === 'x' ? C.incorrect : C.primary;
+  const colorB = segmentB === 'x' ? C.incorrect : C.primary;
+  const colorC = segmentC === 'x' ? C.incorrect : C.primary;
+  const colorD = segmentD === 'x' ? C.incorrect : C.primary;
+
+  const OFF = 22;
+  const labelA = { x: (V.x  + L1.x) / 2 - OFF, y: (V.y  + L1.y) / 2 };
+  const labelB = { x: (L1.x + L2.x) / 2 - OFF, y: (L1.y + L2.y) / 2 };
+  const labelC = { x: (V.x  + R1.x) / 2 + OFF, y: (V.y  + R1.y) / 2 };
+  const labelD = { x: (R1.x + R2.x) / 2 + OFF, y: (R1.y + R2.y) / 2 };
+
+  // Centers of parallel lines for tick marks
+  const tick1X = (L1.x + R1.x) / 2;
+  const tick1Y = L1.y; // L1.y === R1.y (same frac from same apex)
+  const tick2X = (L2.x + R2.x) / 2; // = 200
+  const tick2Y = L2.y; // = 270
+
+  const lbl = (seg: number | string, letter: string) => {
+    if (seg === 'x') return `${letter}=x`;
+    return showLabels ? `${letter}=${seg}` : letter;
+  };
+
+  return (
+    <svg viewBox="0 0 400 300" className="w-full max-w-md">
+      {/* Left ray: V → L2 */}
+      <line x1={V.x}  y1={V.y}  x2={L2.x} y2={L2.y} stroke={C.primary} strokeWidth={2.5} />
+      {/* Right ray: V → R2 */}
+      <line x1={V.x}  y1={V.y}  x2={R2.x} y2={R2.y} stroke={C.primary} strokeWidth={2.5} />
+
+      {/* Second parallel — outer, solid */}
+      <line x1={L2.x} y1={L2.y} x2={R2.x} y2={R2.y} stroke={C.neutral} strokeWidth={2} />
+      {/* First parallel — inner, dashed */}
+      <line x1={L1.x} y1={L1.y} x2={R1.x} y2={R1.y}
+        stroke={C.neutral} strokeWidth={1.5} strokeDasharray="6 3" />
+
+      {/* Double tick marks at centre of first parallel */}
+      <line x1={tick1X - 5} y1={tick1Y - 7} x2={tick1X - 5} y2={tick1Y + 7}
+        stroke={C.neutral} strokeWidth={1.5} />
+      <line x1={tick1X + 5} y1={tick1Y - 7} x2={tick1X + 5} y2={tick1Y + 7}
+        stroke={C.neutral} strokeWidth={1.5} />
+      {/* Double tick marks at centre of second parallel */}
+      <line x1={tick2X - 5} y1={tick2Y - 7} x2={tick2X - 5} y2={tick2Y + 7}
+        stroke={C.neutral} strokeWidth={1.5} />
+      <line x1={tick2X + 5} y1={tick2Y - 7} x2={tick2X + 5} y2={tick2Y + 7}
+        stroke={C.neutral} strokeWidth={1.5} />
+
+      {/* Key point dots */}
+      {[V, L1, R1, L2, R2].map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r={4} fill={C.primary} />
+      ))}
+
+      {/* Segment labels */}
+      <text x={labelA.x} y={labelA.y} textAnchor="middle" dominantBaseline="middle"
+        fontSize={14} fontWeight="600" fill={colorA}>
+        {lbl(segmentA, 'a')}
+      </text>
+      <text x={labelB.x} y={labelB.y} textAnchor="middle" dominantBaseline="middle"
+        fontSize={14} fontWeight="600" fill={colorB}>
+        {lbl(segmentB, 'b')}
+      </text>
+      <text x={labelC.x} y={labelC.y} textAnchor="middle" dominantBaseline="middle"
+        fontSize={14} fontWeight="600" fill={colorC}>
+        {lbl(segmentC, 'c')}
+      </text>
+      <text x={labelD.x} y={labelD.y} textAnchor="middle" dominantBaseline="middle"
+        fontSize={14} fontWeight="600" fill={colorD}>
+        {lbl(segmentD, 'd')}
+      </text>
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // TalesDiagram — unified dispatcher
 // ---------------------------------------------------------------------------
 
-export type TalesDiagramType = 'classic' | 'shadow' | 'similar' | 'inaccessible';
+export type TalesDiagramType = 'classic' | 'shadow' | 'similar' | 'inaccessible' | 'triangle';
 
 type TalesDiagramProps =
   | ({ type: 'classic'      } & TalesClassicSVGProps)
   | ({ type: 'shadow'       } & TalesShadowSVGProps)
   | ({ type: 'similar'      } & TalesSimilarSVGProps)
-  | ({ type: 'inaccessible' } & TalesInaccessibleSVGProps);
+  | ({ type: 'inaccessible' } & TalesInaccessibleSVGProps)
+  | ({ type: 'triangle'     } & TalesTriangleSVGProps);
 
 export function TalesDiagram(props: TalesDiagramProps) {
   if (props.type === 'classic') {
@@ -549,6 +673,17 @@ export function TalesDiagram(props: TalesDiagramProps) {
         seg2={props.seg2}
         seg3={props.seg3}
         seg4={props.seg4}
+        showLabels={props.showLabels}
+      />
+    );
+  }
+  if (props.type === 'triangle') {
+    return (
+      <TalesTriangleSVG
+        segmentA={props.segmentA}
+        segmentB={props.segmentB}
+        segmentC={props.segmentC}
+        segmentD={props.segmentD}
         showLabels={props.showLabels}
       />
     );

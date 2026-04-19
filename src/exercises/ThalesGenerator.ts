@@ -17,12 +17,13 @@ import type { ExerciseStep } from "../core/ExerciseSteps";
 
 function resolveDiagramType(level: ThalesLevel): TalesDiagramType | null {
   switch (level) {
-    case 'TALES_BASIC':    return 'classic';
-    case 'TALES_SHADOWS':  return 'shadow';
-    case 'TALES_SCALE':    return null;
-    case 'TALES_CONTEXT':  return null;
-    case 'SIMILAR_ID':     return 'similar';
-    case 'PROPORTION_BASIC': return null;
+    case 'TALES_BASIC':        return 'classic';
+    case 'TRIANG_TALES_BASIC': return 'triangle';
+    case 'TALES_SHADOWS':      return 'shadow';
+    case 'TALES_SCALE':        return null;
+    case 'TALES_CONTEXT':      return null;
+    case 'SIMILAR_ID':         return 'similar';
+    case 'PROPORTION_BASIC':   return null;
   }
 }
 
@@ -537,7 +538,8 @@ export class ThalesGenerator implements ExerciseGenerator {
     // SIMILAR_ID is a visual-only exercise not yet wired to this generator.
     // Any unrecognised level falls back to TALES_BASIC.
     const KNOWN_LEVELS: readonly ThalesLevel[] = [
-      'PROPORTION_BASIC', 'TALES_BASIC', 'TALES_SHADOWS', 'TALES_SCALE', 'TALES_CONTEXT',
+      'PROPORTION_BASIC', 'TALES_BASIC', 'TRIANG_TALES_BASIC',
+      'TALES_SHADOWS', 'TALES_SCALE', 'TALES_CONTEXT', 'SIMILAR_ID',
     ];
     const level: ThalesLevel = KNOWN_LEVELS.includes(requestedLevel) ? requestedLevel : 'TALES_BASIC';
 
@@ -552,8 +554,8 @@ export class ThalesGenerator implements ExerciseGenerator {
       params.educationalLevel = options.educationalLevel;
     }
 
-    // 3a. TALES_BASIC — early return, no LLM needed (SVG is primary content)
-    if (level === 'TALES_BASIC') {
+    // 3a. TALES_BASIC / TRIANG_TALES_BASIC — early return, no LLM needed (SVG is primary content)
+    if (level === 'TALES_BASIC' || level === 'TRIANG_TALES_BASIC') {
       const v = params.values as {
         segmentA: number; segmentB: number; segmentC: number; segmentD: number;
       };
@@ -565,15 +567,16 @@ export class ThalesGenerator implements ExerciseGenerator {
                    : unknownField === 'segmentC' ? c
                    : d;
       const steps = buildTalesBasicSteps(a, b, c, d, unknownField);
+      const isTriangle = level === 'TRIANG_TALES_BASIC';
       const instance: ExerciseInstance = {
-        id: `tales-basic-${Date.now()}`,
+        id: `tales-${isTriangle ? 'triang-' : ''}basic-${Date.now()}`,
         type: 'thales',
         prompt: '',
         solution: { correct: answer },
         data: {},
         metadata: {
-          level: 'TALES_BASIC',
-          diagramType: 'classic',
+          level,
+          diagramType: isTriangle ? 'triangle' : 'classic',
           statementCatalan: '',
           statementTranslated: null,
           svgParams: {
@@ -590,7 +593,40 @@ export class ThalesGenerator implements ExerciseGenerator {
       return instance;
     }
 
-    // 3b. LLM contextualization for all other levels — async
+    // 3b. SIMILAR_ID — early return, visual-only exercise (no LLM)
+    if (level === 'SIMILAR_ID') {
+      const v = params.values as any;
+      const pair1 = {
+        triangle1: [v.p1t1a, v.p1t1b, v.p1t1c] as [number, number, number],
+        triangle2: [v.p1t2a, v.p1t2b, v.p1t2c] as [number, number, number],
+        areSimilar: v.correctPair === 1,
+      };
+      const pair2 = {
+        triangle1: [v.p2t1a, v.p2t1b, v.p2t1c] as [number, number, number],
+        triangle2: [v.p2t2a, v.p2t2b, v.p2t2c] as [number, number, number],
+        areSimilar: v.correctPair === 2,
+      };
+      const instance: ExerciseInstance = {
+        id: `tales-similar-${Date.now()}`,
+        type: 'thales',
+        prompt: '',
+        solution: { correct: v.correctPair },
+        data: {},
+        metadata: {
+          level: 'SIMILAR_ID',
+          diagramType: 'similar',
+          statementCatalan:
+            'Observa les dues parelles de triangles. Quina parella conté dos triangles semblants?',
+          statementTranslated: null,
+          svgParams: { pair1, pair2, correctPair: v.correctPair },
+          tolerance: 0,
+          currentStepIndex: 0,
+        },
+      };
+      return instance;
+    }
+
+    // 3c. LLM contextualization for all other levels — async
     const ctx = await ExerciseContextualizer.contextualize(params);
 
     // 4. Build ExerciseInstance

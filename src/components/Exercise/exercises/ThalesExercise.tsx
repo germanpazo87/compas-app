@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo } from "react";
 import type { ExerciseInstance, AnswerEvaluationResult } from "../../../core/ExerciseEngine";
-import { TalesDiagram } from "../../geometry/TalesSVG";
-import type { TalesDiagramType } from "../../geometry/TalesSVG";
+import { TalesDiagram, TalesSimilarSVG } from "../../geometry/TalesSVG";
+import type { TalesDiagramType, TrianglePair } from "../../geometry/TalesSVG";
 import type { ExerciseStep, StepResult } from "../../../core/ExerciseSteps";
 import { Calculator } from "../../tools/Calculator";
 import { Calculator as CalcIcon } from "lucide-react";
@@ -461,6 +461,117 @@ function TalesSteppedUI({
   );
 }
 
+// ── SIMILAR_ID UI ─────────────────────────────────────────────────────────────
+
+interface SimilarIdUIProps {
+  svgParams: Record<string, any>;
+  statementCatalan: string;
+  onAnswerChange: (answer: unknown) => void;
+  onSubmit: () => void;
+  evaluationResult: AnswerEvaluationResult | null;
+  loadingEvaluation: boolean;
+}
+
+function SimilarIdUI({
+  svgParams,
+  statementCatalan,
+  onAnswerChange,
+  onSubmit,
+  evaluationResult,
+  loadingEvaluation,
+}: SimilarIdUIProps) {
+  const [selectedPair, setSelectedPair] = useState<1 | 2 | null>(null);
+  const [feedback, setFeedback]         = useState<'correct' | 'incorrect' | null>(null);
+  const [isLocked, setIsLocked]         = useState(false);
+
+  const { pair1, pair2, correctPair } = svgParams as {
+    pair1: { triangle1: [number,number,number]; triangle2: [number,number,number]; areSimilar: boolean };
+    pair2: { triangle1: [number,number,number]; triangle2: [number,number,number]; areSimilar: boolean };
+    correctPair: 1 | 2;
+  };
+
+  const pairs: [TrianglePair, TrianglePair] = [
+    { sides: pair1.triangle1, sides2: pair1.triangle2 },
+    { sides: pair2.triangle1, sides2: pair2.triangle2 },
+  ];
+
+  function handleSelect(i: 0 | 1) {
+    if (isLocked) return;
+    setSelectedPair((i + 1) as 1 | 2);
+    setFeedback(null); // reset feedback when selection changes
+  }
+
+  function handleCheck() {
+    if (selectedPair === null || isLocked) return;
+    const correct = selectedPair === correctPair;
+    setFeedback(correct ? 'correct' : 'incorrect');
+    if (correct) {
+      setIsLocked(true);
+      onAnswerChange(selectedPair);
+      setTimeout(() => onSubmit(), 1500);
+    }
+  }
+
+  const showAnswer = feedback === 'correct';
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Header + statement + SVG */}
+      <div className="p-6 border-b border-gray-100">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+            Teorema de Tales
+          </span>
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+            SIMILAR ID
+          </span>
+        </div>
+        <p className="text-base text-gray-800 leading-relaxed mb-5">{statementCatalan}</p>
+        <div className="flex justify-center">
+          <TalesSimilarSVG
+            pairs={pairs}
+            selected={selectedPair != null ? ((selectedPair - 1) as 0 | 1) : null}
+            showAnswer={showAnswer}
+            areSimilar={[pair1.areSimilar, pair2.areSimilar]}
+            onSelect={!isLocked ? handleSelect : undefined}
+          />
+        </div>
+        <p className="text-xs text-gray-400 text-center mt-2">
+          Fes clic sobre la parella que conté dos triangles semblants.
+        </p>
+      </div>
+
+      {/* Action row */}
+      <div className="p-6 flex flex-col gap-3">
+        {feedback === 'correct' && (
+          <div className="text-sm font-medium text-green-600">
+            ✓ Correcte! La parella {correctPair} conté triangles semblants.
+          </div>
+        )}
+        {feedback === 'incorrect' && (
+          <div className="text-sm font-medium text-red-600">
+            ✗ Incorrecte. Revisa les proporcions dels costats i torna-ho a intentar.
+          </div>
+        )}
+        {!isLocked && (
+          <button
+            onClick={handleCheck}
+            disabled={selectedPair === null || loadingEvaluation}
+            className="self-start px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            Comprova
+          </button>
+        )}
+        {evaluationResult && (
+          <div className={`text-sm font-medium ${evaluationResult.correct ? 'text-green-600' : 'text-red-600'}`}>
+            {evaluationResult.feedback}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Shared glossed-text renderer ──────────────────────────────────────────────
 
 /**
@@ -500,7 +611,22 @@ export function ThalesExercise({
   const [showDiagram, setShowDiagram] = useState(true);
   const [showCalc, setShowCalc] = useState(false);
 
-  // ── Stepped mode (TALES_BASIC) ────────────────────────────────────────────
+  // ── SIMILAR_ID mode ──────────────────────────────────────────────────────
+
+  if (meta.level === 'SIMILAR_ID') {
+    return (
+      <SimilarIdUI
+        svgParams={meta.svgParams}
+        statementCatalan={meta.statementCatalan ?? ''}
+        onAnswerChange={onAnswerChange}
+        onSubmit={onSubmit}
+        evaluationResult={evaluationResult}
+        loadingEvaluation={loadingEvaluation}
+      />
+    );
+  }
+
+  // ── Stepped mode (TALES_BASIC / TRIANG_TALES_BASIC) ───────────────────────
 
   const hasSteps = Array.isArray(meta.steps) && meta.steps.length > 0;
 

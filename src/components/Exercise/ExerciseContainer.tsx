@@ -85,8 +85,10 @@ function getConceptIdForExercise(type: ExerciseType, options?: any): string {
   if (type === 'thales') {
     const level: string | undefined = options?.level;
     switch (level) {
-      case 'TALES_BASIC':    return 'tales_basic';
-      case 'TALES_SHADOWS':  return 'tales_shadows';
+      case 'TALES_BASIC':        return 'tales_basic';
+      case 'TRIANG_TALES_BASIC': return 'tales_basic';
+      case 'SIMILAR_ID':         return 'tales_basic';
+      case 'TALES_SHADOWS':      return 'tales_shadows';
       case 'TALES_SCALE':    return 'tales_scale';
       case 'TALES_CONTEXT':  return 'tales_context';
       default:               return 'proportion';
@@ -378,8 +380,9 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
       topicLabel = "Geometria";
       setCurrentTopic("Geometria");
       const levelNames: Record<string, string> = {
-        PROPORTION_BASIC: "Proporcions bàsiques",
-        TALES_BASIC:    "Tales bàsic",
+        PROPORTION_BASIC:    "Proporcions bàsiques",
+        TALES_BASIC:         "Tales bàsic",
+        TRIANG_TALES_BASIC:  "Tales triangle",
         TALES_SHADOWS:  "Ombres i alçades",
         TALES_SCALE:    "Escales i plànols",
         TALES_CONTEXT:  "Aplicacions",
@@ -746,8 +749,10 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tales</span>
                 <div className="flex flex-wrap gap-1.5">
-                  <button onClick={() => loadExercise("thales", { level: "TALES_BASIC" })}   className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">📐 Tales bàsic</button>
-                  <button onClick={() => loadExercise("thales", { level: "TALES_SHADOWS" })} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🌤 Ombres</button>
+                  <button onClick={() => loadExercise("thales", { level: "TALES_BASIC" })}         className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">📐 Tales bàsic</button>
+                  <button onClick={() => loadExercise("thales", { level: "TRIANG_TALES_BASIC" })} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🔺 Tales triangle</button>
+                  <button onClick={() => loadExercise("thales", { level: "SIMILAR_ID" })}         className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🔷 Semblants</button>
+                  <button onClick={() => loadExercise("thales", { level: "TALES_SHADOWS" })}      className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🌤 Ombres</button>
                   <button onClick={() => loadExercise("thales", { level: "TALES_SCALE" })}   className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🗺 Escales</button>
                   <button onClick={() => loadExercise("thales", { level: "TALES_CONTEXT" })} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">🏙 Aplicació</button>
                 </div>

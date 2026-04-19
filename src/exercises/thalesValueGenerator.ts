@@ -16,6 +16,7 @@ export type ThalesLevel =
   | 'SIMILAR_ID'
   | 'PROPORTION_BASIC'
   | 'TALES_BASIC'
+  | 'TRIANG_TALES_BASIC'
   | 'TALES_SHADOWS'
   | 'TALES_SCALE'
   | 'TALES_CONTEXT';
@@ -133,6 +134,51 @@ function generateTalesScale(): ExerciseParams {
       preferredLanguage: 'ca',
     };
   }
+}
+
+function generateSimilarId(): ExerciseParams {
+  const BASE_TRIPLES: [number, number, number][] = [
+    [3, 4, 5], [5, 12, 13], [6, 8, 10],
+  ];
+  // Pre-verified non-similar pairs: sorted ratios a1/a2, b1/b2, c1/c2 are NOT all equal
+  const NON_SIMILAR_PAIRS: [[number,number,number],[number,number,number]][] = [
+    [[3, 4, 6], [5, 8, 11]],
+    [[4, 5, 7], [6, 8, 11]],
+    [[3, 5, 7], [4, 6, 9]],
+    [[5, 6, 8], [7, 9, 12]],
+  ];
+
+  // Similar pair: same base triple, two different scale factors
+  const base = randomFrom(BASE_TRIPLES);
+  const [a, b, c] = base;
+  const k1 = randomFrom([1, 2, 3] as const);
+  let k2 = randomFrom([2, 3, 4] as const);
+  if (k2 === k1) k2 = k2 < 4 ? k2 + 1 : 2;
+  const simT1: [number, number, number] = [a * k1, b * k1, c * k1];
+  const simT2: [number, number, number] = [a * k2, b * k2, c * k2];
+
+  // Non-similar pair: pick from pre-verified list
+  const nonSimPair = randomFrom(NON_SIMILAR_PAIRS);
+  const nonSimT1 = nonSimPair[0];
+  const nonSimT2 = nonSimPair[1];
+
+  // Randomly assign which pair is the similar one (1-indexed)
+  const correctPair = randomFrom([1, 2] as const);
+  const [p1t1, p1t2] = correctPair === 1 ? [simT1, simT2] : [nonSimT1, nonSimT2];
+  const [p2t1, p2t2] = correctPair === 1 ? [nonSimT1, nonSimT2] : [simT1, simT2];
+
+  return {
+    type: 'SIMILAR_ID',
+    values: {
+      p1t1a: p1t1[0], p1t1b: p1t1[1], p1t1c: p1t1[2],
+      p1t2a: p1t2[0], p1t2b: p1t2[1], p1t2c: p1t2[2],
+      p2t1a: p2t1[0], p2t1b: p2t1[1], p2t1c: p2t1[2],
+      p2t2a: p2t2[0], p2t2b: p2t2[1], p2t2c: p2t2[2],
+      correctPair,
+    },
+    unknownField: 'correctPair',
+    preferredLanguage: 'ca',
+  };
 }
 
 function generateTalesBasic(): ExerciseParams {
@@ -258,10 +304,14 @@ export function generateThalesValues(level: ThalesLevel): ExerciseParams {
       return generateTalesScale();
     case 'TALES_BASIC':
       return generateTalesBasic();
+    case 'TRIANG_TALES_BASIC': {
+      const base = generateTalesBasic();
+      return { ...base, type: 'TRIANG_TALES_BASIC' };
+    }
     case 'TALES_CONTEXT':
       return generateTalesContext();
     case 'SIMILAR_ID':
-      throw new Error(`ThalesLevel 'SIMILAR_ID' is not yet implemented`);
+      return generateSimilarId();
     case 'PROPORTION_BASIC': {
       const base = generateTalesBasic();
       return { ...base, type: 'PROPORTION_BASIC' };
