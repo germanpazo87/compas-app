@@ -7,6 +7,7 @@ import { FrequencyTableExercise } from "./exercises/FrequencyTableExercise";
 import { MedianExercise } from "./exercises/MedianExercise";
 import { ThalesExercise } from "./exercises/ThalesExercise";
 import { PythagorasExercise } from "./exercises/PythagorasExercise";
+import { PrerequisiteExercise } from "./exercises/PrerequisiteExercise";
 
 interface ExerciseRendererProps {
   exercise: ExerciseInstance;
@@ -21,6 +22,7 @@ interface ExerciseRendererProps {
     correct: boolean;
     attemptsOnStep: number;
   }) => void;
+  onStepComplete?: (answer: number | string) => void;
 }
 
 export function ExerciseRenderer(props: ExerciseRendererProps) {
@@ -117,6 +119,21 @@ export function ExerciseRenderer(props: ExerciseRendererProps) {
         evaluationResult={props.evaluationResult}
         loadingEvaluation={props.loadingEvaluation}
         onStepAttempt={props.onStepAttempt}
+        onStepComplete={props.onStepComplete}
+      />
+    );
+  }
+
+  // 5. PREREQUISIT
+  if (props.exercise.type === "prerequisite") {
+    return (
+      <PrerequisiteExercise
+        exercise={props.exercise}
+        userAnswer={props.userAnswer}
+        onAnswerChange={props.onAnswerChange}
+        onSubmit={props.onSubmit}
+        evaluationResult={props.evaluationResult}
+        loadingEvaluation={props.loadingEvaluation}
       />
     );
   }

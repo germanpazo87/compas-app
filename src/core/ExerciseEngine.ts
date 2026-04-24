@@ -7,7 +7,8 @@ export type ExerciseType =
   | "statistics"
   | "arithmetic"
   | "thales"
-  | "pythagoras";
+  | "pythagoras"
+  | "prerequisite";
 
 export type StatisticsLevel = 
   | "CONCEPTUAL"       // Nivell 1
@@ -44,7 +45,7 @@ export interface StatisticsMetadata {
 
 export interface ExerciseInstance<T=any, S = any, M = StatisticsMetadata> {
   id: string;
-  type: "statistics" | "arithmetic" | "fractions" | "thales" | "pythagoras";
+  type: "statistics" | "arithmetic" | "fractions" | "thales" | "pythagoras" | "prerequisite";
   prompt: string;
   solution: S;
   data: T;

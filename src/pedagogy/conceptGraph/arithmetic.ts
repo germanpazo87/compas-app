@@ -72,4 +72,28 @@ export const arithmeticConceptGraph: ConceptGraph = {
     relatedConcepts: ["percentages", "scaling"],
     tags: ["intermediate", "applications"],
   },
+
+  // ---------------------------------------------------------------------------
+  // Prerequisite / remediation nodes
+  // ---------------------------------------------------------------------------
+
+  powers: {
+    id: "powers",
+    domain: "arithmetic",
+    difficulty: 1,
+    prerequisites: [],
+    relatedConcepts: ["multiples"],
+    tags: ["arithmetic", "prerequisite"],
+  },
+
+  // square_root already defined in geometry.ts (id: "square_root") — no duplicate here
+
+  proportion_basic: {
+    id: "proportion_basic",
+    domain: "arithmetic",
+    difficulty: 2,
+    prerequisites: ["fractions"],
+    relatedConcepts: ["proportions", "ratios"],
+    tags: ["arithmetic", "proportion", "prerequisite"],
+  },
 };

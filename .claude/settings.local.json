@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(cd:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find C:UsersUsuario.LAPTOP-CFL88BMIcompassrcpedagogyconceptGraph -type f -name *)",
+      "Bash(git add:*)"
     ]
   }
 }

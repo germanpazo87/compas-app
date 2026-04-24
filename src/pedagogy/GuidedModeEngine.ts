@@ -8,12 +8,13 @@
 
 import type { StudentModel } from "../studentModel/types";
 import type { ConceptGraph } from "./conceptGraph/types";
+import type { ExerciseType } from "../core/ExerciseEngine";
 
 export type GuidedTopic = 'thales' | 'pythagoras';
 
 export interface GuidedSelection {
-  exerciseType: 'thales' | 'pythagoras';
-  level: string;
+  exerciseType: ExerciseType;
+  level: string | undefined;
   conceptId: string;
   reason: 'prerequisite_not_met' | 'lowest_mastery' | 'reinforcement';
 }
@@ -45,6 +46,17 @@ const PYTHAGORAS_MAP: Record<string, { exerciseType: 'pythagoras'; level: string
 // Private helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Maps prerequisite concept IDs to their remediation exercise.
+ * Used by selectRemediationExercise.
+ */
+const PREREQ_EXERCISE_MAP: Record<string, GuidedSelection> = {
+  square_root:      { exerciseType: 'prerequisite', level: 'SQRT',       conceptId: 'square_root',      reason: 'prerequisite_not_met' },
+  powers:           { exerciseType: 'prerequisite', level: 'POWERS',     conceptId: 'powers',           reason: 'prerequisite_not_met' },
+  proportion_basic: { exerciseType: 'prerequisite', level: 'PROPORTION', conceptId: 'proportion_basic', reason: 'prerequisite_not_met' },
+  fractions:        { exerciseType: 'fractions',    level: undefined,    conceptId: 'fractions',        reason: 'prerequisite_not_met' },
+};
+
 /** Concept IDs that live in the arithmetic area, not geometry. */
 const ARITHMETIC_CONCEPTS = new Set(['fractions', 'proportion', 'proportions', 'ratio']);
 
@@ -54,7 +66,12 @@ const ARITHMETIC_CONCEPTS = new Set(['fractions', 'proportion', 'proportions', '
  * then geometry area. Returns 0 safely for new students with no data.
  */
 function getMasteryForConcept(conceptId: string, studentState: StudentModel): number {
-  // Prerequisite nodes that live in the arithmetic area
+  // Prerequisite concepts tracked as conceptual competences in the arithmetic area
+  if (conceptId === 'square_root' || conceptId === 'powers' || conceptId === 'proportion_basic') {
+    return studentState.areas?.arithmetic?.competences?.conceptual?.[conceptId]?.performance ?? 0;
+  }
+
+  // Other prerequisite nodes that live in the arithmetic area (general calc proxy)
   if (ARITHMETIC_CONCEPTS.has(conceptId)) {
     return studentState.areas?.arithmetic?.competences?.calculation_specific?.performance ?? 0;
   }
@@ -80,12 +97,13 @@ function getMasteryForConcept(conceptId: string, studentState: StudentModel): nu
  * Selects the optimal next exercise level for the given topic.
  *
  * Algorithm:
- * 1. Candidate concepts = mapping keys that exist in the concept graph,
- *    sorted ascending by difficulty.
- * 2. Split into prerequisitesMet / notMet (all prereqs mastery >= 0.7).
- * 3. If NO candidates have prerequisites met → return easiest (new student).
- * 4. From candidates with prerequisites met, pick lowest mastery below 0.85.
- * 5. If all are >= 0.85 → reinforcement on the hardest.
+ * 1. frontier = concepts where all prereqs have mastery >= 0.7 (or no prereqs)
+ *    AND the concept itself has mastery < 0.7 (not yet consolidated).
+ * 2. If frontier non-empty: pick randomly from frontier → reason 'lowest_mastery'.
+ * 3. If frontier empty (all consolidated): pick randomly from ALL candidates
+ *    → reason 'reinforcement'.
+ *
+ * Consolidation threshold: 0.7
  */
 export function selectNextExercise(
   topic: GuidedTopic,
@@ -94,63 +112,56 @@ export function selectNextExercise(
 ): GuidedSelection {
   const map = topic === 'thales' ? THALES_MAP : PYTHAGORAS_MAP;
 
-  // Only use concept IDs that exist in the supplied graph
-  const candidateIds = Object.keys(map)
-    .filter(id => conceptGraph[id] !== undefined)
-    .sort((a, b) => conceptGraph[a].difficulty - conceptGraph[b].difficulty);
+  // Candidates: only concept IDs present in both the map and the supplied graph
+  const candidateIds = Object.keys(map).filter(id => conceptGraph[id] !== undefined);
 
-  const met: string[] = [];
-  const notMet: string[] = [];
-
+  // Step 1: Build frontier
+  const frontier: string[] = [];
   for (const id of candidateIds) {
     const node = conceptGraph[id];
-    const allPrereqsMet = node.prerequisites.every(
+    const prereqsMet = node.prerequisites.every(
       prereqId => getMasteryForConcept(prereqId, studentState) >= 0.7
     );
-    if (allPrereqsMet) {
-      met.push(id);
-    } else {
-      notMet.push(id);
+    const ownMastery = getMasteryForConcept(id, studentState);
+    if (prereqsMet && ownMastery < 0.7) {
+      frontier.push(id);
     }
   }
 
-  // Step 3: No prerequisites met at all — safe fallback for new students.
-  // Prefer a node with no prerequisites at all (guaranteed entry point).
-  // If none found (all nodes have at least one prerequisite), use the
-  // hardcoded topic fallback which is always implemented.
-  if (met.length === 0) {
-    const noPrereqId = candidateIds.find(id => conceptGraph[id].prerequisites.length === 0);
-    if (noPrereqId) {
-      const { exerciseType, level } = map[noPrereqId];
-      return { exerciseType, level, conceptId: noPrereqId, reason: 'prerequisite_not_met' };
+  // Step 2: Pick randomly from frontier
+  if (frontier.length > 0) {
+    const chosen = frontier[Math.floor(Math.random() * frontier.length)];
+    const { exerciseType, level } = map[chosen];
+    return { exerciseType, level, conceptId: chosen, reason: 'lowest_mastery' };
+  }
+
+  // Step 3: All consolidated — reinforce at random
+  const pool = candidateIds.length > 0 ? candidateIds : Object.keys(map);
+  const chosen = pool[Math.floor(Math.random() * pool.length)];
+  const { exerciseType, level } = map[chosen];
+  return { exerciseType, level, conceptId: chosen, reason: 'reinforcement' };
+}
+
+/**
+ * Returns a remediation exercise for a failed concept, or null if no
+ * prerequisite needs remediation (mastery of all prereqs >= 0.5).
+ *
+ * Called by ExerciseContainer after an incorrect answer in adaptive mode.
+ */
+export function selectRemediationExercise(
+  failedConceptId: string,
+  studentState: StudentModel,
+  conceptGraph: ConceptGraph
+): GuidedSelection | null {
+  const node = conceptGraph[failedConceptId];
+  if (!node) return null;
+
+  for (const prereqId of node.prerequisites) {
+    if (!PREREQ_EXERCISE_MAP[prereqId]) continue;
+    const mastery = getMasteryForConcept(prereqId, studentState);
+    if (mastery < 0.5) {
+      return PREREQ_EXERCISE_MAP[prereqId];
     }
-    // Absolute topic fallback — always implemented
-    const fallbackId = topic === 'thales' ? 'tales_basic' : 'right_triangle_id';
-    const { exerciseType, level } = map[fallbackId];
-    return { exerciseType, level, conceptId: fallbackId, reason: 'prerequisite_not_met' };
   }
-
-  // Step 4: Find the node in `met` with the lowest mastery below 0.85
-  let selected: string | null = null;
-  let lowestMastery = Infinity;
-
-  for (const id of met) {
-    const mastery = getMasteryForConcept(id, studentState);
-    if (mastery < 0.85 && mastery < lowestMastery) {
-      lowestMastery = mastery;
-      selected = id;
-    }
-  }
-
-  if (selected !== null) {
-    const { exerciseType, level } = map[selected];
-    return { exerciseType, level, conceptId: selected, reason: 'lowest_mastery' };
-  }
-
-  // Step 5: All nodes with prerequisites met are >= 0.85 — reinforce the hardest
-  const hardest = [...met].sort(
-    (a, b) => conceptGraph[b].difficulty - conceptGraph[a].difficulty
-  )[0];
-  const { exerciseType, level } = map[hardest];
-  return { exerciseType, level, conceptId: hardest, reason: 'reinforcement' };
+  return null;
 }

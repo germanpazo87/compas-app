@@ -8,7 +8,7 @@ import {
 import type { ExerciseStep, StepResult } from "../../core/ExerciseSteps";
 import type { CompasLLMResponse as CompasResponse } from "../../core/llmContract";
 import type { StudentModel } from "../../studentModel/types";
-import { selectNextExercise, type GuidedTopic } from "../../pedagogy/GuidedModeEngine";
+import { selectNextExercise, selectRemediationExercise, type GuidedTopic } from "../../pedagogy/GuidedModeEngine";
 import { unifiedConceptGraph } from "../../pedagogy/conceptGraph";
 
 // 🛡️ INTEGRACIÓ DE MÈTRIQUES I MODEL
@@ -27,10 +27,24 @@ import { CompasService } from "../../services/CompasService";
 // 2. Components visuals
 import { ExerciseRenderer } from "./ExerciseRenderer";
 import { CompasSidebar } from "./CompasSidebar";
+import { ReflectionScreen } from "./ReflectionScreen";
 
 // 🛠️ IMPORTS DE LAYOUT
 import { AppShell } from "../Layout/AppShell";
 import { CompasLabLayout } from "../Debug/CompasLabLayout"; 
+
+
+const REFLECTION_QUESTIONS = [
+  // Category A — Procedure
+  "Explica amb les teves paraules els passos que has seguit per resoldre aquest exercici.",
+  "Descriu el mètode que has fet servir. Per quin pas has tingut més dificultat?",
+  // Category B — Transfer
+  "En quin altre context de la vida real podries aplicar el mateix mètode que acabes d'usar?",
+  "Pensa en una situació del teu dia a dia on poguessis usar aquest càlcul. Descriu-la.",
+  // Category C — Obstacles
+  "Quin ha estat l'obstacle principal d'aquest exercici i com l'has superat?",
+  "Què has après avui que no sabies abans? Explica-ho amb les teves paraules.",
+];
 
 interface ExerciseContainerProps {
   student: StudentModel;
@@ -48,6 +62,15 @@ interface ExerciseContainerProps {
  *  - Fractions                → calculation_specific
  */
 function getCompetenceId(exercise: ExerciseInstance): string {
+  if (exercise.type === 'prerequisite') {
+    const level = (exercise.metadata as any)?.level as string | undefined;
+    const prereqId = level === 'SQRT'       ? 'square_root'
+                   : level === 'POWERS'     ? 'powers'
+                   : level === 'PROPORTION' ? 'proportion_basic'
+                   : 'calculation_specific';
+    console.log(`[getCompetenceId] prerequisite level=${level} → competenceId=${prereqId} (writes to arithmetic.conceptual['${prereqId}'])`);
+    return prereqId;
+  }
   if (exercise.type === 'fractions') return 'calculation_specific';
   if (exercise.type === 'thales') {
     const level = (exercise.metadata as any)?.level as string | undefined;
@@ -56,8 +79,8 @@ function getCompetenceId(exercise: ExerciseInstance): string {
   }
   if (exercise.type === 'pythagoras') {
     const level = (exercise.metadata as any)?.level as string | undefined;
-    if (level === 'RIGHT_TRIANGLE_ID' || level === 'HYPOTENUSE_ID')
-      return 'statistics_conceptual'; // temporary; will be geometry_conceptual
+    if (level === 'RIGHT_TRIANGLE_ID') return 'right_triangle_id';
+    if (level === 'HYPOTENUSE_ID')     return 'hypotenuse_id';
     if (level === 'PYTH_VERIFY') return 'problem_solving_specific';
     return 'calculation_specific';
   }
@@ -81,6 +104,15 @@ function getCompetenceId(exercise: ExerciseInstance): string {
  * IDs must match nodes defined in src/pedagogy/conceptGraph/.
  */
 function getConceptIdForExercise(type: ExerciseType, options?: any): string {
+  if (type === 'prerequisite') {
+    const level: string | undefined = options?.level;
+    switch (level) {
+      case 'POWERS':     return 'powers';
+      case 'SQRT':       return 'square_root';
+      case 'PROPORTION': return 'proportion_basic';
+      default:           return 'powers';
+    }
+  }
   if (type === 'fractions') return 'fractions';
   if (type === 'thales') {
     const level: string | undefined = options?.level;
@@ -149,6 +181,23 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
 
   // Step results accumulator — reset on each new exercise load
   const stepResultsRef = useRef<StepResult[]>([]);
+
+  // 💭 CAPA 5: REFLEXIÓ
+  const [showReflection, setShowReflection] = useState(false);
+  const [reflectionQuestion, setReflectionQuestion] = useState('');
+  // Holds the session log payload until reflection completes (then written with reflectionResponse)
+  const pendingSessionLogRef = useRef<Record<string, unknown> | null>(null);
+  // Holds the answer from a stepped exercise completion (bypasses stale userAnswer state)
+  const pendingAnswerRef = useRef<number | string | null>(null);
+
+  // 🔄 MODE ADAPTATIU
+  const [isAdaptiveMode, setIsAdaptiveMode] = useState(false);
+  const [adaptiveTopic, setAdaptiveTopic] = useState<GuidedTopic | null>(null);
+  const lastConceptIdRef = useRef<string | null>(null);
+  const [isRemediating, setIsRemediating] = useState(false);
+
+  // 🛡️ ANTI-DOUBLE-EVALUATION: prevents re-evaluation if Comprova is clicked again
+  const [hasEvaluated, setHasEvaluated] = useState(false);
 
   // 🧭 ESTAT DEL MODE (guiat vs lliure)
   const [exerciseMode, setExerciseMode] = useState<'guided' | 'free'>('free');
@@ -346,10 +395,36 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
   };
 
   /**
+   * 💭 CAPA 5: REFLEXIÓ — called when student submits (or skips) the reflection
+   */
+  const handleReflectionComplete = async (response: string) => {
+    setShowReflection(false);
+    if (pendingSessionLogRef.current) {
+      const logData = { ...pendingSessionLogRef.current, reflectionResponse: response || null };
+      pendingSessionLogRef.current = null;
+      try {
+        await AuthService.writeSessionLog(logData.studentId as string, logData);
+      } catch (logError) {
+        console.warn("⚠️ Reflection log write failed (non-critical):", logError);
+      }
+    }
+    // 🔄 AUTO-ADVANCE after reflection (user interaction ensures studentState is current)
+    if (isAdaptiveMode && adaptiveTopic !== null) {
+      const topic = adaptiveTopic;
+      setTimeout(() => loadGuidedExercise(topic), 2000);
+    }
+  };
+
+  /**
    * 🏗️ CÀRREGA D'EXERCICI AMB GATEKEEPER
    */
   async function loadExercise(type: ExerciseType, options?: any, _mode: 'guided' | 'free' = 'free') {
     setExerciseMode(_mode);
+    if (_mode === 'free') {
+      setIsAdaptiveMode(false);
+      setAdaptiveTopic(null);
+      lastConceptIdRef.current = null;
+    }
     setLoadingExercise(true);
     setExercise(null);
     setUserAnswer(null);
@@ -359,6 +434,11 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
     setAttemptNumber(0);
     setLlmInteractionCount(0);
     stepResultsRef.current = [];
+    setShowReflection(false);
+    pendingSessionLogRef.current = null;
+    pendingAnswerRef.current = null;
+    setHasEvaluated(false);
+    setIsRemediating(false);
 
     // Breadcrumbs i Topic Labeling
     let topicLabel = "Estadística";
@@ -401,6 +481,15 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
         PYTH_CONTEXT:      "Aplicacions",
       };
       setCurrentLevelName(levelNames[options?.level] ?? "Pitàgores");
+    } else if (type === "prerequisite") {
+      topicLabel = "Prerequisits";
+      setCurrentTopic("Prerequisits");
+      const names: Record<string, string> = {
+        POWERS:     "Potències",
+        SQRT:       "Arrels quadrades",
+        PROPORTION: "Proporcions",
+      };
+      setCurrentLevelName(names[options?.level] ?? "Prerequisit");
     }
 
     // 🧠 1. DETERMINEM EL CONCEPTE ACTUAL PER AL SCHEDULER
@@ -438,26 +527,62 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
   }
 
   /**
-   * 🧭 MODE GUIAT: Selecciona el nivell òptim basat en el model de l'alumne
+   * 🧭 MODE GUIAT / ADAPTATIU: Selecciona el nivell òptim basat en el model de l'alumne.
+   * stateOverride: pass the freshly-updated StudentModel from submitAnswer to avoid
+   * stale closure issues when called from a setTimeout.
    */
-  function loadGuidedExercise(topic: GuidedTopic) {
-    const selection = selectNextExercise(topic, studentState, unifiedConceptGraph);
+  function loadGuidedExercise(topic: GuidedTopic, stateOverride?: StudentModel) {
+    setIsAdaptiveMode(true);
+    setAdaptiveTopic(topic);
+
+    const currentState = stateOverride ?? studentState;
+    const selection = selectNextExercise(topic, currentState, unifiedConceptGraph);
     console.log(`🧭 Mode guiat → ${selection.conceptId} (reason: ${selection.reason})`);
+
+    lastConceptIdRef.current = selection.conceptId;
     loadExercise(selection.exerciseType, { level: selection.level }, 'guided');
   }
 
   /**
-   * 🏗️ SUBMIT ANSWER: El punt on tota la matemàtica del model convergeix
+   * 🏗️ SUBMIT ANSWER — wrapper that guards against null userAnswer (non-stepped exercises)
    */
   async function submitAnswer() {
     if (!exercise || userAnswer === null) return;
+    await submitAnswerWithValue(userAnswer);
+  }
+
+  /**
+   * 💡 STEP COMPLETE HANDLER — called by stepped exercises when all steps finish.
+   * Bypasses the stale-userAnswer problem: answer is passed directly rather than
+   * read from React state (which hasn't been committed yet at call time).
+   */
+  function handleStepComplete(answer: number | string) {
+    pendingAnswerRef.current = answer;
+    setUserAnswer(answer);
+    setTimeout(() => {
+      if (pendingAnswerRef.current !== null) {
+        submitAnswerWithValue(pendingAnswerRef.current);
+        pendingAnswerRef.current = null;
+      }
+    }, 50);
+  }
+
+  /**
+   * 🏗️ SUBMIT ANSWER WITH VALUE: El punt on tota la matemàtica del model convergeix.
+   * Accepts the answer explicitly so it works both from the normal submit flow
+   * and from stepped-exercise completions (where userAnswer state may be stale).
+   */
+  async function submitAnswerWithValue(answer: unknown) {
+    if (!exercise) return;
+    if (hasEvaluated) return;
     setLoadingEvaluation(true);
+    setHasEvaluated(true);
 
     // Captura el comptador LLM actual com a valor local per evitar problemes d'estat async
     let llmCountThisExercise = llmInteractionCount;
 
     try {
-      const result = await ExerciseService.evaluate(exercise, userAnswer);
+      const result = await ExerciseService.evaluate(exercise, answer);
       setEvaluationResult(result);
       const newAttempt = attemptNumber + 1;
       setAttemptNumber(newAttempt);
@@ -505,7 +630,7 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
           const { response, debug } = await CompasService.ask({
             intent: 'exercise_help',
             exercise: exercise,
-            userAnswer: userAnswer,
+            userAnswer: answer,
             errorType: (result.error_type ?? ExerciseErrorType.WRONG_RESULT),
             attemptNumber: newAttempt,
             isCorrect: result.correct,
@@ -540,38 +665,78 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
         : studentWithCounter.areas[areaKey].competences.conceptual[competenceId];
       console.log(`💾 Progrés guardat [${competenceId}]. Mastery: ${updatedComp?.performance?.toFixed(3)}`);
 
-      // 📝 SESSION LOG (aïllat: un error aquí no trenca el flux principal)
-      try {
-        const hasSteps = Array.isArray((exercise.metadata as any)?.steps) &&
-          (exercise.metadata as any).steps.length > 0;
+      // 📝 SESSION LOG — build payload
+      const hasSteps = Array.isArray((exercise.metadata as any)?.steps) &&
+        (exercise.metadata as any).steps.length > 0;
 
-        await AuthService.writeSessionLog(studentWithCounter.id, {
-          studentId: studentWithCounter.id,
-          timestamp: Date.now(),
-          block: exercise.type === 'statistics'  ? 'statistics'
-               : exercise.type === 'thales'      ? 'thales'
-               : exercise.type === 'pythagoras'  ? 'pythagoras'
-               : 'arithmetic',
-          exerciseType: exercise.type,
-          exerciseLevel: (exercise.metadata as any)?.level ?? null,
-          attemptCount: newAttempt,
-          llmInteractionCount: llmCountThisExercise,
-          timeSeconds: metrics.latencyMs > 0 ? metrics.latencyMs / 1000 : null,
-          masteryBefore,
-          masteryAfter,
-          masteryDelta: masteryAfter !== null && masteryBefore !== null
-            ? parseFloat((masteryAfter - masteryBefore).toFixed(4))
-            : null,
-          evocationScore: studentWithCounter.global.lastEvocationScore ?? null,
-          condition: null,
-          ...(hasSteps ? {
-            stepsCompleted:    stepResultsRef.current.filter(r => r.correct).length,
-            stepResults:       stepResultsRef.current,
-            totalStepAttempts: stepResultsRef.current.reduce((s, r) => s + r.attempts, 0),
-          } : {}),
-        });
-      } catch (logError) {
-        console.warn("⚠️ Session log write failed (non-critical):", logError);
+      const sessionLogData: Record<string, unknown> = {
+        studentId: studentWithCounter.id,
+        timestamp: Date.now(),
+        block: exercise.type === 'statistics'   ? 'statistics'
+             : exercise.type === 'thales'       ? 'thales'
+             : exercise.type === 'pythagoras'   ? 'pythagoras'
+             : exercise.type === 'prerequisite' ? 'prerequisite'
+             : 'arithmetic',
+        exerciseType: exercise.type,
+        exerciseLevel: (exercise.metadata as any)?.level ?? null,
+        attemptCount: newAttempt,
+        llmInteractionCount: llmCountThisExercise,
+        timeSeconds: metrics.latencyMs > 0 ? metrics.latencyMs / 1000 : null,
+        masteryBefore,
+        masteryAfter,
+        masteryDelta: masteryAfter !== null && masteryBefore !== null
+          ? parseFloat((masteryAfter - masteryBefore).toFixed(4))
+          : null,
+        evocationScore: studentWithCounter.global.lastEvocationScore ?? null,
+        condition: null,
+        ...(hasSteps ? {
+          stepsCompleted:    stepResultsRef.current.filter(r => r.correct).length,
+          stepResults:       stepResultsRef.current,
+          totalStepAttempts: stepResultsRef.current.reduce((s, r) => s + r.attempts, 0),
+        } : {}),
+      };
+
+      // 💭 CAPA 5: REFLEXIÓ — defer log write if geometry + correct + mastery >= 0.6
+      const isGeometry = exercise.type === 'thales' || exercise.type === 'pythagoras';
+      const masteryForReflection =
+        ((studentWithCounter.areas as any)?.geometry?.competences?.problem_solving_specific?.performance ?? 0) as number;
+      const shouldReflect = result.correct && isGeometry && masteryForReflection >= 0.6;
+
+      if (shouldReflect) {
+        const q = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];
+        setReflectionQuestion(q);
+        pendingSessionLogRef.current = sessionLogData;
+        setShowReflection(true);
+      } else {
+        try {
+          await AuthService.writeSessionLog(studentWithCounter.id, sessionLogData);
+        } catch (logError) {
+          console.warn("⚠️ Session log write failed (non-critical):", logError);
+        }
+      }
+
+      // 🔄 AUTO-ADVANCE / REMEDIATION (adaptive mode)
+      if (isAdaptiveMode && adaptiveTopic !== null && !shouldReflect) {
+        const topic = adaptiveTopic;
+        const nextState = studentWithCounter;
+        if (result.correct) {
+          // Return from remediation or normal advance
+          setIsRemediating(false);
+          setTimeout(() => loadGuidedExercise(topic, nextState), 2000);
+        } else {
+          // Try to find a prerequisite that needs remediation
+          const remediation = selectRemediationExercise(
+            lastConceptIdRef.current ?? '', nextState, unifiedConceptGraph
+          );
+          setIsRemediating(true);
+          if (remediation) {
+            console.log(`🔧 Remediation → ${remediation.conceptId} (mastery < 0.5)`);
+            setTimeout(() => loadExercise(remediation.exerciseType, { level: remediation.level }, 'guided'), 2000);
+          } else {
+            // No prereq gap — reload via engine (mastery dropped, same concept likely re-selected)
+            setTimeout(() => loadGuidedExercise(topic, nextState), 2000);
+          }
+        }
       }
 
     } catch (error) {
@@ -608,8 +773,18 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
          </div>
        )}
 
-       {/* ÀREA DE L'EXERCICI (Amb blur si està bloquejat) */}
-       <div className={`transition-all duration-500 ${isEvocationRequired ? 'opacity-20 pointer-events-none filter blur-sm' : 'opacity-100'}`}>
+       {/* 💭 CAPA 5: REFLEXIÓ */}
+       {showReflection && (
+         <div className="absolute inset-0 z-20 flex items-center justify-center backdrop-blur-sm bg-white/70 rounded-xl p-4">
+           <ReflectionScreen
+             question={reflectionQuestion}
+             onComplete={handleReflectionComplete}
+           />
+         </div>
+       )}
+
+       {/* ÀREA DE L'EXERCICI (Amb blur si està bloquejat o en reflexió) */}
+       <div className={`transition-all duration-500 ${(isEvocationRequired || showReflection) ? 'opacity-20 pointer-events-none filter blur-sm' : 'opacity-100'}`}>
           {!loadingExercise && exercise && (
              <ExerciseRenderer
                exercise={exercise}
@@ -619,6 +794,7 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
                evaluationResult={evaluationResult}
                loadingEvaluation={loadingEvaluation}
                onStepAttempt={handleStepAttempt}
+               onStepComplete={handleStepComplete}
              />
           )}
           
@@ -797,6 +973,15 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
                     <button onClick={() => loadExercise("fractions")} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100">🍰 Fraccions</button>
                   </div>
                 </div>
+                {/* Prerequisits section */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Prerequisits</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button onClick={() => loadExercise("prerequisite", { level: "POWERS" })}     className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100">⚡ Potències</button>
+                    <button onClick={() => loadExercise("prerequisite", { level: "SQRT" })}       className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100">√ Arrels</button>
+                    <button onClick={() => loadExercise("prerequisite", { level: "PROPORTION" })} className="px-3 py-1.5 text-xs font-bold rounded-lg border transition whitespace-nowrap bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100">∝ Proporcions</button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -811,6 +996,18 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
             ? <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full font-medium">🧭 Mode adaptatiu</span>
             : <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full font-medium">🔓 Mode lliure</span>
           }
+        </div>
+      )}
+
+      {/* ⏹ STOP ADAPTIVE MODE */}
+      {isAdaptiveMode && (
+        <div className="mb-3">
+          <button
+            onClick={() => { setIsAdaptiveMode(false); setAdaptiveTopic(null); }}
+            className="px-3 py-1.5 text-xs font-bold rounded-lg border transition bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+          >
+            ⏹ Aturar mode adaptatiu
+          </button>
         </div>
       )}
 

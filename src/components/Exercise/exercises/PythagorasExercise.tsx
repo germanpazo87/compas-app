@@ -22,6 +22,7 @@ interface PythagorasExerciseProps {
     correct: boolean;
     attemptsOnStep: number;
   }) => void;
+  onStepComplete?: (answer: number | string) => void;
 }
 
 /**
@@ -53,6 +54,7 @@ interface SteppedUIProps {
   evaluationResult: AnswerEvaluationResult | null;
   loadingEvaluation: boolean;
   onStepAttempt?: PythagorasExerciseProps['onStepAttempt'];
+  onStepComplete?: PythagorasExerciseProps['onStepComplete'];
 }
 
 function SteppedUI({
@@ -68,6 +70,7 @@ function SteppedUI({
   evaluationResult,
   loadingEvaluation,
   onStepAttempt,
+  onStepComplete,
 }: SteppedUIProps) {
   const [stepIndex,     setStepIndex]    = useState(0);
   const [subStepIndex,  setSubStepIndex] = useState(0);
@@ -129,8 +132,12 @@ function SteppedUI({
       stepStartTime.current = Date.now();
     } else {
       setAllComplete(true);
-      onAnswerChange(correctAnswer);
-      onSubmit();
+      if (onStepComplete) {
+        onStepComplete(correctAnswer);
+      } else {
+        onAnswerChange(correctAnswer);
+        onSubmit();
+      }
     }
   }
 
@@ -561,6 +568,7 @@ export function PythagorasExercise({
   evaluationResult,
   loadingEvaluation,
   onStepAttempt,
+  onStepComplete,
 }: PythagorasExerciseProps) {
   const meta = exercise.metadata as {
     level: string;
@@ -597,6 +605,7 @@ export function PythagorasExercise({
         evaluationResult={evaluationResult}
         loadingEvaluation={loadingEvaluation}
         onStepAttempt={onStepAttempt}
+        onStepComplete={onStepComplete}
       />
     );
   }

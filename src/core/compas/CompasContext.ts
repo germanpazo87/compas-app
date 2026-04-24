@@ -10,6 +10,7 @@ import { ExerciseEngine } from "../ExerciseEngine";
 import { StatisticsGenerator } from "../../domain/statistics/StatisticsGenerator";
 import { ThalesGenerator } from "../../exercises/ThalesGenerator";
 import { PythagorasGenerator } from "../../exercises/PythagorasGenerator";
+import { PrerequisiteGenerator } from "../../exercises/PrerequisiteGenerator";
 
 // 1️⃣ GRAF DE CONCEPTES (La base de coneixement estàtica)
 export const graph = statisticsConceptGraph;
@@ -21,7 +22,7 @@ const exerciseRegistry = new Map();
 exerciseRegistry.set("statistics", new StatisticsGenerator());
 exerciseRegistry.set("thales", new ThalesGenerator());
 exerciseRegistry.set("pythagoras", new PythagorasGenerator());
-// Aquí pots afegir fraccions, etc.
+exerciseRegistry.set("prerequisite", new PrerequisiteGenerator());
 
 export const exerciseEngine = new ExerciseEngine(exerciseRegistry, Math.random);
 

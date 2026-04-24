@@ -19,6 +19,7 @@ interface ThalesExerciseProps {
     correct: boolean;
     attemptsOnStep: number;
   }) => void;
+  onStepComplete?: (answer: number | string) => void;
 }
 
 // ── Stepped UI (TALES_BASIC) ───────────────────────────────────────────────────
@@ -35,6 +36,7 @@ interface TalesSteppedUIProps {
   evaluationResult: AnswerEvaluationResult | null;
   loadingEvaluation: boolean;
   onStepAttempt?: ThalesExerciseProps['onStepAttempt'];
+  onStepComplete?: ThalesExerciseProps['onStepComplete'];
 }
 
 function TalesSteppedUI({
@@ -49,6 +51,7 @@ function TalesSteppedUI({
   evaluationResult,
   loadingEvaluation,
   onStepAttempt,
+  onStepComplete,
 }: TalesSteppedUIProps) {
   const [stepIndex,          setStepIndex]          = useState(0);
   const [stepAnswer,         setStepAnswer]         = useState<string>('');
@@ -112,8 +115,12 @@ function TalesSteppedUI({
       stepStartTime.current = Date.now();
     } else {
       setAllComplete(true);
-      onAnswerChange(correctAnswer);
-      onSubmit();
+      if (onStepComplete) {
+        onStepComplete(correctAnswer);
+      } else {
+        onAnswerChange(correctAnswer);
+        onSubmit();
+      }
     }
   }
 
@@ -597,6 +604,7 @@ export function ThalesExercise({
   evaluationResult,
   loadingEvaluation,
   onStepAttempt,
+  onStepComplete,
 }: ThalesExerciseProps) {
   const meta = exercise.metadata as {
     level: string;
@@ -644,6 +652,7 @@ export function ThalesExercise({
         evaluationResult={evaluationResult}
         loadingEvaluation={loadingEvaluation}
         onStepAttempt={onStepAttempt}
+        onStepComplete={onStepComplete}
       />
     );
   }
