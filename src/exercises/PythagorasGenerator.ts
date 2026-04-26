@@ -14,6 +14,7 @@ import type { ExerciseStep } from "../core/ExerciseSteps";
 import { generatePythagorasValues, type PythagorasLevel } from "./pythagorasValueGenerator";
 import { ExerciseContextualizer } from "../services/ExerciseContextualizer";
 import type { PythagorasDiagramType } from "../components/geometry/PythagorasSVG";
+import { debugLog } from "../utils/debugLog";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -452,6 +453,7 @@ export class PythagorasGenerator implements ExerciseGenerator {
       let statementTranslated: string | null = null;
       if (preferredLang !== 'ca') {
         try {
+          const _llmT0 = Date.now();
           const ctx = await ExerciseContextualizer.contextualize({
             type:            'PYTH_HYPOTENUSE_STATEMENT',
             values:          { legA, legB, statement: statementCatalan },
@@ -459,6 +461,7 @@ export class PythagorasGenerator implements ExerciseGenerator {
             preferredLanguage: preferredLang,
           });
           statementTranslated = ctx.statementTranslated;
+          debugLog.llm('pythagoras', level, Date.now() - _llmT0, statementCatalan);
         } catch {
           statementTranslated = null;
         }
@@ -510,6 +513,7 @@ export class PythagorasGenerator implements ExerciseGenerator {
       let statementTranslated: string | null = null;
       if (preferredLang !== 'ca') {
         try {
+          const _llmT0 = Date.now();
           const ctx = await ExerciseContextualizer.contextualize({
             type:              'PYTH_HYPOTENUSE_STATEMENT',
             values:            { legA, legB, statement: statementCatalan },
@@ -517,6 +521,7 @@ export class PythagorasGenerator implements ExerciseGenerator {
             preferredLanguage: preferredLang,
           });
           statementTranslated = ctx.statementTranslated;
+          debugLog.llm('pythagoras', level, Date.now() - _llmT0, statementCatalan);
         } catch {
           statementTranslated = null;
         }
@@ -607,6 +612,7 @@ export class PythagorasGenerator implements ExerciseGenerator {
       let statementTranslated: string | null = null;
       if (preferredLang !== 'ca') {
         try {
+          const _llmT0 = Date.now();
           const ctx = await ExerciseContextualizer.contextualize({
             type:              'PYTH_HYPOTENUSE_STATEMENT',
             values:            { legA, legB, statement: statementCatalan },
@@ -614,6 +620,7 @@ export class PythagorasGenerator implements ExerciseGenerator {
             preferredLanguage: preferredLang,
           });
           statementTranslated = ctx.statementTranslated;
+          debugLog.llm('pythagoras', level, Date.now() - _llmT0, statementCatalan);
         } catch {
           statementTranslated = null;
         }
@@ -660,6 +667,7 @@ export class PythagorasGenerator implements ExerciseGenerator {
       let statementTranslated: string | null = null;
       if (preferredLang !== 'ca') {
         try {
+          const _llmT0 = Date.now();
           const ctx = await ExerciseContextualizer.contextualize({
             type:              'PYTH_HYPOTENUSE_STATEMENT',
             values:            { sideA, sideB, sideC, statement: statementCatalan },
@@ -667,6 +675,7 @@ export class PythagorasGenerator implements ExerciseGenerator {
             preferredLanguage: preferredLang,
           });
           statementTranslated = ctx.statementTranslated;
+          debugLog.llm('pythagoras', level, Date.now() - _llmT0, statementCatalan);
         } catch {
           statementTranslated = null;
         }
@@ -702,7 +711,9 @@ export class PythagorasGenerator implements ExerciseGenerator {
       params.educationalLevel = options.educationalLevel;
     }
 
+    const _llmT0 = Date.now();
     const ctx = await ExerciseContextualizer.contextualize(params);
+    debugLog.llm('pythagoras', level, Date.now() - _llmT0, ctx.statementCatalan);
 
     const instance: ExerciseInstance = {
       id,

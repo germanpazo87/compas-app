@@ -9,6 +9,7 @@ import type { ExerciseStep, StepResult } from "../../core/ExerciseSteps";
 import type { CompasLLMResponse as CompasResponse } from "../../core/llmContract";
 import type { StudentModel } from "../../studentModel/types";
 import { selectNextExercise, selectRemediationExercise, type GuidedTopic } from "../../pedagogy/GuidedModeEngine";
+import { debugLog } from "../../utils/debugLog";
 import { unifiedConceptGraph } from "../../pedagogy/conceptGraph";
 
 // 🛡️ INTEGRACIÓ DE MÈTRIQUES I MODEL
@@ -664,6 +665,7 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
         ? studentWithCounter.areas[areaKey].competences[competenceId as 'calculation_specific' | 'problem_solving_specific']
         : studentWithCounter.areas[areaKey].competences.conceptual[competenceId];
       console.log(`💾 Progrés guardat [${competenceId}]. Mastery: ${updatedComp?.performance?.toFixed(3)}`);
+      debugLog.mastery(areaKey, competenceId, masteryBefore ?? 0, masteryAfter ?? 0);
 
       // 📝 SESSION LOG — build payload
       const hasSteps = Array.isArray((exercise.metadata as any)?.steps) &&
@@ -722,6 +724,7 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
         if (result.correct) {
           // Return from remediation or normal advance
           setIsRemediating(false);
+          debugLog.engine('Auto-advance after correct', { topic: adaptiveTopic, concept: lastConceptIdRef.current });
           setTimeout(() => loadGuidedExercise(topic, nextState), 2000);
         } else {
           // Try to find a prerequisite that needs remediation
@@ -731,9 +734,11 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
           setIsRemediating(true);
           if (remediation) {
             console.log(`🔧 Remediation → ${remediation.conceptId} (mastery < 0.5)`);
+            debugLog.engine('Remediation triggered', { concept: lastConceptIdRef.current, remediating: remediation.conceptId });
             setTimeout(() => loadExercise(remediation.exerciseType, { level: remediation.level }, 'guided'), 2000);
           } else {
             // No prereq gap — reload via engine (mastery dropped, same concept likely re-selected)
+            debugLog.engine('Remediation triggered (no prereq gap, reloading topic)', { concept: lastConceptIdRef.current });
             setTimeout(() => loadGuidedExercise(topic, nextState), 2000);
           }
         }

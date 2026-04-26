@@ -9,6 +9,7 @@
 import type { StudentModel } from "../studentModel/types";
 import type { ConceptGraph } from "./conceptGraph/types";
 import type { ExerciseType } from "../core/ExerciseEngine";
+import { debugLog } from "../utils/debugLog";
 
 export type GuidedTopic = 'thales' | 'pythagoras';
 
@@ -132,14 +133,24 @@ export function selectNextExercise(
   if (frontier.length > 0) {
     const chosen = frontier[Math.floor(Math.random() * frontier.length)];
     const { exerciseType, level } = map[chosen];
-    return { exerciseType, level, conceptId: chosen, reason: 'lowest_mastery' };
+    const selection: GuidedSelection = { exerciseType, level, conceptId: chosen, reason: 'lowest_mastery' };
+    debugLog.adaptive(
+      `Frontier: [${frontier.join(', ')}] → Selected: ${chosen}`,
+      { mastery: getMasteryForConcept(chosen, studentState), reason: 'lowest_mastery' }
+    );
+    return selection;
   }
 
   // Step 3: All consolidated — reinforce at random
   const pool = candidateIds.length > 0 ? candidateIds : Object.keys(map);
   const chosen = pool[Math.floor(Math.random() * pool.length)];
   const { exerciseType, level } = map[chosen];
-  return { exerciseType, level, conceptId: chosen, reason: 'reinforcement' };
+  const selection: GuidedSelection = { exerciseType, level, conceptId: chosen, reason: 'reinforcement' };
+  debugLog.adaptive(
+    `Frontier empty — reinforcing: ${chosen}`,
+    { mastery: getMasteryForConcept(chosen, studentState), reason: 'reinforcement' }
+  );
+  return selection;
 }
 
 /**
@@ -160,8 +171,10 @@ export function selectRemediationExercise(
     if (!PREREQ_EXERCISE_MAP[prereqId]) continue;
     const mastery = getMasteryForConcept(prereqId, studentState);
     if (mastery < 0.5) {
+      debugLog.prereq(failedConceptId, prereqId, mastery, '→ remediation triggered');
       return PREREQ_EXERCISE_MAP[prereqId];
     }
   }
+  debugLog.prereq(failedConceptId, '(none)', 0, '→ no weak prereq found, returning null');
   return null;
 }

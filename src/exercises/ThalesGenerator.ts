@@ -10,6 +10,7 @@ import { generateThalesValues, type ThalesLevel } from "./thalesValueGenerator";
 import { ExerciseContextualizer } from "../services/ExerciseContextualizer";
 import type { TalesDiagramType } from "../components/geometry/TalesSVG";
 import type { ExerciseStep } from "../core/ExerciseSteps";
+import { debugLog } from "../utils/debugLog";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -627,7 +628,9 @@ export class ThalesGenerator implements ExerciseGenerator {
     }
 
     // 3c. LLM contextualization for all other levels — async
+    const _llmT0 = Date.now();
     const ctx = await ExerciseContextualizer.contextualize(params);
+    debugLog.llm('thales', level, Date.now() - _llmT0, ctx.statementCatalan);
 
     // 4. Build ExerciseInstance
     const id = `thales_${level}_${++_instanceCounter}_${Date.now()}`;
