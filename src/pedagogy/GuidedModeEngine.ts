@@ -27,7 +27,7 @@ export interface GuidedSelection {
 
 const THALES_MAP: Record<string, { exerciseType: 'thales'; level: string }> = {
   proportion:    { exerciseType: 'thales', level: 'PROPORTION_BASIC' },
-  similar_id:    { exerciseType: 'thales', level: 'SIMILAR_ID' },
+  similar_figures: { exerciseType: 'thales', level: 'SIMILAR_ID' },
   tales_basic:   { exerciseType: 'thales', level: 'TALES_BASIC' },
   tales_shadows: { exerciseType: 'thales', level: 'TALES_SHADOWS' },
   tales_scale:   { exerciseType: 'thales', level: 'TALES_SCALE' },

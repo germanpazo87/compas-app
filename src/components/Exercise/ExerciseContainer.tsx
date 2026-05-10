@@ -713,9 +713,7 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
 
       // 💭 CAPA 5: REFLEXIÓ — defer log write if geometry + correct + mastery >= 0.6
       const isGeometry = exercise.type === 'thales' || exercise.type === 'pythagoras';
-      const masteryForReflection =
-        ((studentWithCounter.areas as any)?.geometry?.competences?.problem_solving_specific?.performance ?? 0) as number;
-      const shouldReflect = result.correct && isGeometry && masteryForReflection >= 0.6;
+      const shouldReflect = result.correct && isGeometry && (masteryAfter ?? 0) >= 0.6;
 
       if (shouldReflect) {
         const q = REFLECTION_QUESTIONS[Math.floor(Math.random() * REFLECTION_QUESTIONS.length)];

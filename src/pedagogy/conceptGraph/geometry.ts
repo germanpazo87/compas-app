@@ -51,8 +51,8 @@ export const geometryConceptGraph: ConceptGraph = {
     tags: ["thales", "applied", "problem_solving"],
   },
 
-  similar_id: {
-    id: "similar_id",
+  similar_figures: {
+    id: "similar_figures",
     domain: "geometry",
     difficulty: 4,
     prerequisites: ["tales_basic", "proportion"],
