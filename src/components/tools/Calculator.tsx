@@ -126,8 +126,12 @@ export function Calculator({ onClose, variant = 'basic', onResultReady }: Calcul
 
   // ── Scientific expression-builder handlers ───────────────────────────────
   const handleSqrt = () => {
-    setDisplay(d => (afterResult ? "" : d) + "sqrt(");
-    setAfterResult(false);
+    if (afterResult) {
+      setDisplay("sqrt(");
+      setAfterResult(false);
+    } else {
+      setDisplay(d => d === "0" ? "sqrt(" : d + "sqrt(");
+    }
   };
 
   const handleSquare = () => {
@@ -136,8 +140,12 @@ export function Calculator({ onClose, variant = 'basic', onResultReady }: Calcul
   };
 
   const handleOpenParen = () => {
-    setDisplay(d => afterResult ? "(" : d + "(");
-    setAfterResult(false);
+    if (afterResult) {
+      setDisplay("(");
+      setAfterResult(false);
+    } else {
+      setDisplay(d => d === "0" ? "(" : d + "(");
+    }
   };
 
   const handleCloseParen = () => {

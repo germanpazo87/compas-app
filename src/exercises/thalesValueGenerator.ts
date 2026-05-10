@@ -244,18 +244,22 @@ function generateTalesContext(subtype?: TalesContextSubtype): ExerciseParams {
   switch (selected) {
     case 'inaccessible_distance': {
       // Proportion: stakeHeight / stakeShadow = objectDistance / measuredDistance
-      // Generate all 4 as clean integers: pick 3, derive the 4th.
+      // PA (stakeHeight) and AB (stakeShadow) are small stake distances (close to observer).
+      // PC (objectDistance) is a large known distance (20-100m).
+      // CD (measuredDistance) is derived: CD = AB * PC / PA.
+      // This ensures physical plausibility: stakes a few metres away, targets tens of metres away.
       const UNKNOWN_FIELDS = [
         'stakeHeight', 'stakeShadow', 'objectDistance', 'measuredDistance',
       ] as const;
 
       for (let i = 0; i < MAX_RETRIES; i++) {
-        const stakeHeight      = randomInt(1, 5);
-        const stakeShadow      = randomInt(1, 5);
-        const measuredDistance = randomInt(5, 30);
-        const objectDistance   = (stakeHeight * measuredDistance) / stakeShadow;
+        const stakeHeight    = randomInt(2, 8);                             // PA: 2–8m
+        const stakeShadow    = randomInt(1, Math.min(5, stakeHeight - 1));  // AB: 1–5m, always < PA
+        const objectDistance = randomInt(20, 100);                          // PC: 20–100m (large, known)
+        const measuredDistance = (stakeShadow * objectDistance) / stakeHeight; // CD = AB*PC/PA
 
-        if (!Number.isInteger(objectDistance) || objectDistance < 1 || objectDistance > 200) continue;
+        if (!Number.isInteger(measuredDistance)) continue;
+        if (measuredDistance > 500 || measuredDistance < 10) continue;
 
         // Reject if any two of the four values are equal
         const vals = [stakeHeight, stakeShadow, objectDistance, measuredDistance];
@@ -269,11 +273,11 @@ function generateTalesContext(subtype?: TalesContextSubtype): ExerciseParams {
           preferredLanguage: 'ca',
         };
       }
-      // Hard fallback: 3/2 = 18/12  (all distinct, integer cross-product)
+      // Hard fallback: PA=4, AB=2, PC=50, CD=25 — proportion 4/2=50/25=2, all distinct
       return {
         type: 'TALES_CONTEXT',
-        values: { subtype: 'inaccessible_distance', stakeHeight: 3, stakeShadow: 2, objectDistance: 18, measuredDistance: 12 },
-        unknownField: 'objectDistance',
+        values: { subtype: 'inaccessible_distance', stakeHeight: 4, stakeShadow: 2, objectDistance: 50, measuredDistance: 25 },
+        unknownField: 'measuredDistance',
         preferredLanguage: 'ca',
       };
     }

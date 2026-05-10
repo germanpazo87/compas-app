@@ -91,20 +91,34 @@ const PYTH_TRIPLES: readonly [number, number, number][] = [
 // Value generators
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns the largest interior angle (degrees) of a triangle using the law of cosines.
+ * Used to verify that non-right distractors are clearly not right-angled
+ * (largest angle < 70° or > 110°).
+ */
+function largestAngleDeg(a: number, b: number, c: number): number {
+  // Sort so that c is always the longest side (angle C is the largest)
+  const sides = [a, b, c].sort((x, y) => x - y);
+  const [s1, s2, s3] = sides;
+  const cosC = (s1 * s1 + s2 * s2 - s3 * s3) / (2 * s1 * s2);
+  return Math.acos(Math.max(-1, Math.min(1, cosC))) * 180 / Math.PI;
+}
+
 function generateRightTriangleId(): ExerciseParams {
   const NAMED: readonly [number, number, number][] = [[3, 4, 5], [5, 12, 13], [8, 15, 17]];
-  // Clearly non-right distractors: obtuse (visually wide) and equilateral shapes
+  // Distractors with largest angle clearly < 70° (equilateral) or > 110° (clearly obtuse).
+  // Removed: [2,2,3]≈97°, [4,4,5]≈77°, [2,4,5]≈108°, [4,7,8]≈89° — all too close to 90°.
   const NON_RIGHT_DISTRACTORS: readonly [number, number, number][] = [
-    [2, 2, 3],  // isosceles acute — very flat
-    [4, 4, 5],  // isosceles acute
-    [3, 3, 5],  // isosceles obtuse — clearly wide
-    [2, 6, 7],  // scalene obtuse — very asymmetric
-    [5, 5, 9],  // isosceles obtuse — very wide
-    [3, 3, 3],  // equilateral — clearly no right angle
-    [2, 4, 5],  // scalene obtuse
-    [6, 6, 6],  // equilateral
-    [2, 2, 2],  // equilateral small
-    [4, 7, 8],  // scalene obtuse
+    [3, 3, 5],  // isosceles obtuse ≈113°
+    [2, 6, 7],  // scalene obtuse  ≈112°
+    [5, 5, 9],  // isosceles obtuse ≈128°
+    [3, 3, 3],  // equilateral 60°
+    [6, 6, 6],  // equilateral 60°
+    [2, 2, 2],  // equilateral 60°
+    [3, 5, 7],  // scalene obtuse  ≈120°
+    [4, 5, 8],  // scalene obtuse  ≈125°
+    [3, 4, 6],  // scalene obtuse  ≈117°
+    [4, 4, 4],  // equilateral 60°
   ];
 
   const [ra, rb, rc] = randomFrom(NAMED);

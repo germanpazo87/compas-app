@@ -88,6 +88,12 @@ const CONTEXT_CONSTRAINTS: Record<string, string> = {
     'NEVER use different point names. ' +
     'NEVER describe shadows, heights or sun rays. ' +
     'CRITICAL: use ONLY the exact numeric values provided. ' +
+    'The distances must be physically plausible: PA and AB (stake distances) should be small (1-10m), ' +
+    'while PC and CD (target distances) should be clearly larger (20-200m). ' +
+    'Never describe a situation where the stake distances are larger than or equal to the target distances. ' +
+    'Frame it as: the observer stands at P, places stakes at A (a few meters away) and B ' +
+    '(a few more meters from A), then measures to the far side: ' +
+    'PC is the near target distance, CD is the inaccessible distance to calculate. ' +
     'Use Barcelona obstacles: Besòs river, Llobregat, ' +
     'a wide avenue, railway tracks, park paths, etc.',
   PYTH_HYPOTENUSE:

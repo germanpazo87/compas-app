@@ -71,10 +71,10 @@ function TalesSteppedUI({
   const totalSteps = steps.length;
   const isLocked   = stepFeedback === 'correct';
 
-  // Reveal the unknown value in the SVG from step 3 (proportion) onwards.
-  // For shadow and inaccessible: steps 1-2 are identification/labelling —
-  // keep 'x' hidden until step 3 (index 2). For classic: always reveal.
-  const revealThreshold = (diagramType === 'shadow' || diagramType === 'inaccessible') ? 2 : 0;
+  // Never replace 'x' with the numeric answer during the exercise.
+  // The SVG always shows 'x' in red for the unknown segment across all steps.
+  // The actual value is shown only in step feedback after the student calculates it.
+  const revealThreshold = totalSteps;
   const showActualValues = stepIndex >= revealThreshold;
   const displaySvgParams = showActualValues
     ? {

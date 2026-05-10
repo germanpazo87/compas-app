@@ -8,7 +8,7 @@ import {
 import type { ExerciseStep, StepResult } from "../../core/ExerciseSteps";
 import type { CompasLLMResponse as CompasResponse } from "../../core/llmContract";
 import type { StudentModel } from "../../studentModel/types";
-import { selectNextExercise, selectRemediationExercise, type GuidedTopic } from "../../pedagogy/GuidedModeEngine";
+import { selectNextExercise, selectRemediationExercise, type GuidedTopic, type GuidedSelection } from "../../pedagogy/GuidedModeEngine";
 import { debugLog } from "../../utils/debugLog";
 import { unifiedConceptGraph } from "../../pedagogy/conceptGraph";
 
@@ -82,8 +82,11 @@ function getCompetenceId(exercise: ExerciseInstance): string {
     const level = (exercise.metadata as any)?.level as string | undefined;
     if (level === 'RIGHT_TRIANGLE_ID') return 'right_triangle_id';
     if (level === 'HYPOTENUSE_ID')     return 'hypotenuse_id';
-    if (level === 'PYTH_VERIFY') return 'problem_solving_specific';
-    return 'calculation_specific';
+    if (level === 'PYTH_HYPOTENUSE')   return 'pythagorean_basic';
+    if (level === 'PYTH_LEG')          return 'pythagorean_leg';
+    if (level === 'PYTH_VERIFY')       return 'pythagorean_verify';
+    if (level === 'PYTH_CONTEXT')      return 'pythagorean_context';
+    return 'pythagorean_basic';
   }
   const level = (exercise.metadata as any)?.level as string | undefined;
   switch (level) {
@@ -195,6 +198,7 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
   const [isAdaptiveMode, setIsAdaptiveMode] = useState(false);
   const [adaptiveTopic, setAdaptiveTopic] = useState<GuidedTopic | null>(null);
   const lastConceptIdRef = useRef<string | null>(null);
+  const lastSelectionRef = useRef<GuidedSelection | null>(null);
   const [isRemediating, setIsRemediating] = useState(false);
 
   // 🛡️ ANTI-DOUBLE-EVALUATION: prevents re-evaluation if Comprova is clicked again
@@ -541,6 +545,7 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
     console.log(`🧭 Mode guiat → ${selection.conceptId} (reason: ${selection.reason})`);
 
     lastConceptIdRef.current = selection.conceptId;
+    lastSelectionRef.current = selection;
     loadExercise(selection.exerciseType, { level: selection.level }, 'guided');
   }
 
@@ -737,9 +742,14 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
             debugLog.engine('Remediation triggered', { concept: lastConceptIdRef.current, remediating: remediation.conceptId });
             setTimeout(() => loadExercise(remediation.exerciseType, { level: remediation.level }, 'guided'), 2000);
           } else {
-            // No prereq gap — reload via engine (mastery dropped, same concept likely re-selected)
-            debugLog.engine('Remediation triggered (no prereq gap, reloading topic)', { concept: lastConceptIdRef.current });
-            setTimeout(() => loadGuidedExercise(topic, nextState), 2000);
+            // No prereq gap — reload the SAME exercise (never pick a harder one after failure)
+            debugLog.engine('Remediation triggered (no prereq gap, reloading same exercise)', { concept: lastConceptIdRef.current });
+            const last = lastSelectionRef.current;
+            if (last) {
+              setTimeout(() => loadExercise(last.exerciseType, { level: last.level }, 'guided'), 2000);
+            } else {
+              setTimeout(() => loadGuidedExercise(topic, nextState), 2000);
+            }
           }
         }
       }

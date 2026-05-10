@@ -141,6 +141,21 @@ export function selectNextExercise(
     return selection;
   }
 
+  // Step 2b: New-student fallback — frontier empty because all prereqs unmet (mastery=0)
+  // Start with the easiest concept rather than randomly picking a hard one.
+  const allNew = candidateIds.every(id => getMasteryForConcept(id, studentState) <= 0.1);
+  if (allNew) {
+    const easiestId = topic === 'thales' ? 'tales_basic' : 'right_triangle_id';
+    const targetId = map[easiestId] ? easiestId : candidateIds[0];
+    const { exerciseType, level } = map[targetId];
+    const selection: GuidedSelection = { exerciseType, level, conceptId: targetId, reason: 'lowest_mastery' };
+    debugLog.adaptive(
+      `New student fallback → ${targetId}`,
+      { mastery: 0, reason: 'lowest_mastery' }
+    );
+    return selection;
+  }
+
   // Step 3: All consolidated — reinforce at random
   const pool = candidateIds.length > 0 ? candidateIds : Object.keys(map);
   const chosen = pool[Math.floor(Math.random() * pool.length)];
