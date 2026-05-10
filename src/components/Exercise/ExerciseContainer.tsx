@@ -870,7 +870,7 @@ export function ExerciseContainer({ student }: ExerciseContainerProps) {
     <AppShell 
       student={studentState} 
       breadcrumbs={[currentTopic, currentLevelName]} 
-      onLogout={() => console.log("Logout placeholder")}
+      onLogout={() => AuthService.logout()}
       sidebar={
         <CompasSidebar 
           response={compasResponse} 

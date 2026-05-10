@@ -505,9 +505,11 @@ function buildTalesContextSteps(
       order: 4,
       type: 'cross_product',
       instruction:
-        'Aplica el producte en creu:\n' +
-        '[ ]·[ ] = [ ]·[ ]\n' +
-        'Omple els quatre buits amb els valors corresponents.',
+        'Aplica el producte en creu.\n' +
+        '[Dades identificades:\n' +
+        shortLbls.map((lbl, i) => i !== unkIdx ? `${lbl} = ${numVals[i]}` : null).filter(Boolean).join('\n') +
+        ']\n' +
+        'Omple els quatre buits:',
       hint: crossHint,
       correctAnswer: `${lhs1}|${lhs2}|${rhs1}|${rhs2}`,
       crossProductTemplate: { lhs1, lhs2, rhs1, rhs2 },

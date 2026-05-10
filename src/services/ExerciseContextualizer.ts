@@ -64,6 +64,10 @@ const CONTEXT_CONSTRAINTS: Record<string, string> = {
     'The four values are heights and shadow lengths. ' +
     'CRITICAL: Use ONLY the exact numeric values provided in "Mathematical values" — ' +
     'do NOT invent, round, or change any number. The statement must use these exact values verbatim. ' +
+    'Specifically: personHeight, personShadow, objectHeight, objectShadow must each appear ' +
+    'in the statement EXACTLY as given — no rounding, no substitution, no approximation. ' +
+    'If the values are e.g. personHeight=1.8, personShadow=1.2, objectShadow=20, objectHeight=30, ' +
+    'the statement MUST say those exact numbers. ' +
     'Do NOT use named real buildings or monuments (Torre Agbar, Sagrada Família, etc.) — ' +
     'their known heights contradict the exercise values. Use generic objects instead: ' +
     'lamppost (fanal), flagpole (pal de bandera), tree (arbre), ' +

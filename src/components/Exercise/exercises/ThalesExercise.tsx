@@ -475,6 +475,7 @@ interface SimilarIdUIProps {
   statementCatalan: string;
   onAnswerChange: (answer: unknown) => void;
   onSubmit: () => void;
+  onStepComplete?: (answer: number | string) => void;
   evaluationResult: AnswerEvaluationResult | null;
   loadingEvaluation: boolean;
 }
@@ -484,6 +485,7 @@ function SimilarIdUI({
   statementCatalan,
   onAnswerChange,
   onSubmit,
+  onStepComplete,
   evaluationResult,
   loadingEvaluation,
 }: SimilarIdUIProps) {
@@ -514,8 +516,12 @@ function SimilarIdUI({
     setFeedback(correct ? 'correct' : 'incorrect');
     if (correct) {
       setIsLocked(true);
-      onAnswerChange(selectedPair);
-      setTimeout(() => onSubmit(), 1500);
+      if (onStepComplete) {
+        onStepComplete(selectedPair);
+      } else {
+        onAnswerChange(selectedPair);
+        setTimeout(() => onSubmit(), 1500);
+      }
     }
   }
 
@@ -628,6 +634,7 @@ export function ThalesExercise({
         statementCatalan={meta.statementCatalan ?? ''}
         onAnswerChange={onAnswerChange}
         onSubmit={onSubmit}
+        onStepComplete={onStepComplete}
         evaluationResult={evaluationResult}
         loadingEvaluation={loadingEvaluation}
       />
