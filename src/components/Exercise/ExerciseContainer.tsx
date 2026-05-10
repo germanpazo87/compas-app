@@ -75,8 +75,16 @@ function getCompetenceId(exercise: ExerciseInstance): string {
   if (exercise.type === 'fractions') return 'calculation_specific';
   if (exercise.type === 'thales') {
     const level = (exercise.metadata as any)?.level as string | undefined;
-    if (level === 'SIMILAR_ID') return 'statistics_conceptual'; // temporary; will be geometry_conceptual
-    return 'problem_solving_specific';
+    switch (level) {
+      case 'TALES_BASIC':
+      case 'TRIANG_TALES_BASIC': return 'tales_basic';
+      case 'TALES_SHADOWS':      return 'tales_shadows';
+      case 'TALES_SCALE':        return 'tales_scale';
+      case 'TALES_CONTEXT':      return 'tales_context';
+      case 'SIMILAR_ID':         return 'similar_figures';
+      case 'PROPORTION_BASIC':   return 'proportion';
+      default:                   return 'tales_basic';
+    }
   }
   if (exercise.type === 'pythagoras') {
     const level = (exercise.metadata as any)?.level as string | undefined;
