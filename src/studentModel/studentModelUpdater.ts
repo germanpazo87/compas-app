@@ -3,9 +3,8 @@ import type { StudentModel, Competence, MedalType, GlobalCompetences } from "./t
 // ============================================================================
 // 📊 CONSTANTS DEL SISTEMA PEDAGÒGIC
 // ============================================================================
-const BASE_GAIN = 0.15;      // Increment per encert
+const BASE_GAIN = 0.20;      // Increment per encert
 const BASE_LOSS = 0.10;      // Decrement per error
-const RETRIEVAL_BONUS = 0.5; // Multiplicador d'impacte positiu (Activació alta = aprèn més)
 
 /**
  * Utilitat: Limita valor entre min i max
@@ -54,34 +53,21 @@ export function generateCompasSystemPrompt(model: StudentModel): string {
 function calculateNewCompetenceState(
   prev: Competence,
   isCorrect: boolean,
-  reliability: number,       
-  retrievalQuality: number   
+  reliability: number,
+  retrievalQuality: number,
+  qualityFactor: number,
 ): Competence {
-  
-  // 1️⃣ FILTRE D'ENTRADA (Reliability)
-  // Si la fiabilitat és baixa (<0.5), l'impacte es redueix per evitar soroll.
-  const impactFactor = Math.max(0.1, reliability); 
 
-  // 2️⃣ MULTIPLICADOR D'IMPACTE (Retrieval)
-  // L'impacte de l'exercici es multiplica per la qualitat de l'activació prèvia
-  const cognitiveMultiplier = 1 + (retrievalQuality * RETRIEVAL_BONUS);
-
-  // 3️⃣ CÀLCUL DEL NUCLI (Mastery Delta)
+  // CÀLCUL DEL NUCLI (Mastery Delta)
+  // Gain: diminishing returns × quality-adjusted rate
+  // Loss: fixed penalty regardless of quality
   let delta = 0;
   if (isCorrect) {
-    // FORMULA GUANY: Base * Fiabilitat * (1 + BonusEvocació)
-    delta = BASE_GAIN * impactFactor * cognitiveMultiplier;
+    const effectiveLearningRate = BASE_GAIN * qualityFactor;
+    delta = (1 - prev.performance) * effectiveLearningRate;
   } else {
-    // 💡 MILLORA: Si l'alumne ha activat bé el concepte però s'equivoca en el càlcul, 
-    // la penalització és menor (error procedimental, no conceptual).
-    const mitigation = retrievalQuality * 0.4; // Mitigació del 40% si l'evocació és perfecta
-    
-    // FORMULA PÈRDUA: -Base * Fiabilitat * (1 - Mitigació)
-    delta = -(BASE_LOSS * impactFactor * (1 - mitigation));
+    delta = -BASE_LOSS;
   }
-
-  // Debug intern per veure la matemàtica
-  // console.log(`🧮 Delta Calc: ${delta.toFixed(4)} (Correct: ${isCorrect}, Retr: ${retrievalQuality})`);
 
   // Actualitzem Mastery (Clamped 0-1)
   const newPerformance = clamp(prev.performance + delta, 0, 1);
@@ -122,6 +108,43 @@ function calculateMedal(mastery: number, stability: number): MedalType {
   return 'NONE';
 }
 
+/** Options passed by the caller to inform quality-adjusted learning rate. */
+export interface UpdateOptions {
+  stepResults?: Array<{ attempts: number }>;
+  attemptCount?: number;
+  exerciseLevel?: string;
+}
+
+const BINARY_LEVELS = new Set(['SIMILAR_ID', 'PYTH_VERIFY']);
+
+/**
+ * Computes a qualityFactor ∈ [0.1, 1.0] that scales the effective learning rate.
+ * Only applied to correct answers; incorrect answers always incur the full penalty.
+ */
+function computeQualityFactor(options?: UpdateOptions): number {
+  if (!options) return 1.0;
+  const { stepResults, attemptCount, exerciseLevel } = options;
+
+  // Binary exercises (2 options): correct by elimination has minimal value
+  if (exerciseLevel && BINARY_LEVELS.has(exerciseLevel) && (attemptCount ?? 1) > 1) {
+    return clamp(0.15, 0.1, 1.0);
+  }
+
+  // Stepped exercises
+  if (stepResults && stepResults.length > 0) {
+    const failedSteps = stepResults.filter(r => r.attempts > 1).length;
+    if (failedSteps === 0) return 1.0;
+    if (failedSteps === 1) return clamp(0.6, 0.1, 1.0);
+    return clamp(0.3, 0.1, 1.0);
+  }
+
+  // Single-answer exercises
+  const attempts = attemptCount ?? 1;
+  if (attempts === 1) return 1.0;
+  if (attempts === 2) return clamp(0.4, 0.1, 1.0);
+  return clamp(0.2, 0.1, 1.0);
+}
+
 /**
  * 🔄 UPDATER PRINCIPAL (Versió Scoring Total)
  * Punt d'entrada principal per actualitzar l'estat.
@@ -131,7 +154,8 @@ export function updateStudentState(
   areaId: keyof StudentModel["areas"],
   competenceId: string,
   correct: boolean,
-  integrityScore: number 
+  integrityScore: number,
+  options?: UpdateOptions,
 ): void {
   // 🕵️ DEBUG START
   console.groupCollapsed(`🧠 UPDATER: ${areaId} > ${competenceId}`);
@@ -198,14 +222,15 @@ export function updateStudentState(
   // Recuperem la qualitat de l'última evocació (si existeix) o un valor baix (0.2)
   // per defecte per penalitzar la falta d'activació.
   const retrievalQuality = model.global.lastEvocationScore ?? 0.2;
+  const qualityFactor = correct ? computeQualityFactor(options) : 1.0;
 
   console.log(`🧠 Retrieval Quality Input: ${retrievalQuality}`);
 
   // ═══════════════════════════════════════════════════════════
   // 3️⃣ CÀLCUL MATEMÀTIC DEL NOU ESTAT
   // ═══════════════════════════════════════════════════════════
-  
-  const updatedSpecific = calculateNewCompetenceState(specific, correct, integrityScore, retrievalQuality);
+
+  const updatedSpecific = calculateNewCompetenceState(specific, correct, integrityScore, retrievalQuality, qualityFactor);
 
   // Apliquem els canvis a l'objecte original (mutació controlada per React state)
   Object.assign(specific, updatedSpecific);
@@ -221,7 +246,7 @@ export function updateStudentState(
     const globalComp = model.global[globalKey] as Competence;
     
     // La competència global s'actualitza amb menys pes (és transversal)
-    const updatedGlobal = calculateNewCompetenceState(globalComp, correct, integrityScore, retrievalQuality);
+    const updatedGlobal = calculateNewCompetenceState(globalComp, correct, integrityScore, retrievalQuality, qualityFactor);
     
     // Esmorteïm el canvi global (factor 0.2) perquè un sol exercici no desestabilitzi tot
     globalComp.performance = clamp(globalComp.performance * 0.8 + updatedGlobal.performance * 0.2, 0, 1);
