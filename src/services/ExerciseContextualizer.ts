@@ -91,7 +91,14 @@ const CONTEXT_CONSTRAINTS: Record<string, string> = {
     'The statement must reference P, A, B, C, D explicitly. ' +
     'NEVER use different point names. ' +
     'NEVER describe shadows, heights or sun rays. ' +
-    'CRITICAL: use ONLY the exact numeric values provided. ' +
+    'CRITICAL: use ONLY the exact numeric values provided in "Mathematical values" — ' +
+    'do NOT invent, round, or change any number. ' +
+    'The four values provided in Mathematical values are the ONLY values that may appear ' +
+    'in the statement. Every number in the statement must be one of these four values ' +
+    'exactly as given. No rounding, no approximation, no invented numbers. ' +
+    'Specifically: stakeHeight (PA), stakeShadow (AB), objectDistance (PC), and ' +
+    'measuredDistance (CD) must each appear in the statement EXACTLY as given — ' +
+    'no substitution, no approximation. ' +
     'The distances must be physically plausible: PA and AB (stake distances) should be small (1-10m), ' +
     'while PC and CD (target distances) should be clearly larger (20-200m). ' +
     'Never describe a situation where the stake distances are larger than or equal to the target distances. ' +
